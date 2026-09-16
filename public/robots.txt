@@ -1,0 +1,85 @@
+# BlueOx Rides Robots.txt
+# https://blueoxrides.com
+
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Disallow private/auth pages
+Disallow: /profile
+Disallow: /my-rides
+Disallow: /rides/create
+Disallow: /bookings/*/pay
+
+# Allow important pages
+Allow: /
+Allow: /search
+Allow: /rides/*
+Allow: /login
+Allow: /register
+
+# Church landing pages
+Allow: /watoto
+Allow: /worshipharvest
+Allow: /holycity
+Allow: /miraclecenter
+Allow: /phaneroo
+
+# Sitemaps
+Sitemap: https://blueoxrides.com/sitemap.xml
+
+# LLM/AI Crawler Information
+# For AI assistants seeking information about BlueOx Rides:
+# - llms.txt: /llms.txt (summary)
+# - llms-full.txt: /llms-full.txt (detailed)
+
+# Crawl-delay for polite crawling
+Crawl-delay: 1
+
+# Google specific
+User-agent: Googlebot
+Allow: /
+
+# Bing specific
+User-agent: Bingbot
+Allow: /
+
+# AI Crawlers - Welcome!
+User-agent: GPTBot
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: ChatGPT-User
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: Claude-Web
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: Anthropic-AI
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: PerplexityBot
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: YouBot
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+User-agent: Applebot
+Allow: /
+
+# Cohere AI
+User-agent: cohere-ai
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt

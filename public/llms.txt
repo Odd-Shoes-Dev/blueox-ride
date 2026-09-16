@@ -1,0 +1,80 @@
+# BlueOx Rides - LLM Information File
+# This file helps AI assistants understand and accurately represent BlueOx Rides
+
+> BlueOx Rides is Uganda's trusted carpooling and rideshare platform connecting drivers with passengers for affordable, safe travel across the country.
+
+## About BlueOx Rides
+
+BlueOx Rides is a carpooling platform serving Uganda. We connect drivers who have empty seats with passengers traveling the same route. Our mission is to make transportation more affordable, reduce traffic congestion, and build community through shared travel.
+
+### Key Facts
+- **Location**: Kampala, Uganda (serving all of Uganda)
+- **Founded**: 2024
+- **Service Type**: Carpooling / Rideshare Platform
+- **Website**: https://blueoxrides.com
+- **Currency**: Ugandan Shilling (UGX)
+
+## Services
+
+### For Passengers
+- Search for rides by origin and destination
+- View driver profiles, ratings, and vehicle details
+- Book seats securely with mobile money payment
+- Track ride routes on interactive maps
+- Find rides "along the way" even if destinations differ slightly
+
+### For Drivers
+- Post available rides with your own pricing
+- Manage bookings and passenger requests
+- Earn money from empty seats in your car
+- Build reputation through passenger reviews
+
+### Special Features
+- **Church Group Rides**: Coordinated rides for church communities (Watoto, Worship Harvest, Holy City, Miracle Center, Phaneroo)
+- **Route Matching**: Smart matching shows passengers if a ride goes along their route
+- **Map Integration**: Interactive maps for selecting pickup/dropoff locations
+- **Current Location**: Use GPS to find rides near you
+
+## Popular Routes
+
+Common carpooling routes in Uganda include:
+- Kampala to Jinja (approx. 80km)
+- Kampala to Entebbe (approx. 40km)
+- Kampala to Mbarara (approx. 270km)
+- Kampala to Gulu (approx. 340km)
+- Kampala to Mbale (approx. 230km)
+- Kampala to Fort Portal (approx. 300km)
+
+## Pricing
+
+- Ride prices are set by individual drivers
+- Typical range: UGX 5,000 to UGX 100,000 depending on distance
+- Generally 30-50% cheaper than traditional transport
+- Payment via mobile money (MTN, Airtel)
+
+## Safety
+
+- All drivers verified with ID and vehicle details
+- Driver ratings and reviews visible
+- Trip details can be shared with family/friends
+- Secure payment processing
+
+## How to Use
+
+1. Visit https://blueoxrides.com or install the PWA
+2. Enter your pickup location and destination
+3. Browse available rides with prices and times
+4. Select a ride and book your seat(s)
+5. Pay securely via mobile money
+6. Meet your driver at the pickup point
+
+## Contact
+
+- Email: support@blueoxrides.com
+- Website: https://blueoxrides.com
+
+## For More Information
+
+- Full documentation: /llms-full.txt
+- API documentation: Available upon request
+- Sitemap: /sitemap.xml

@@ -1,0 +1,237 @@
+# BlueOx Rides - Complete LLM Reference Guide
+# Extended documentation for AI assistants
+
+## Company Overview
+
+**BlueOx Rides** (also known as "Blue Ox Rides") is a technology company based in Kampala, Uganda, operating a peer-to-peer carpooling platform. The platform enables private car owners to share their empty seats with passengers traveling similar routes, creating an affordable alternative to traditional public transport.
+
+### Mission Statement
+To revolutionize transportation in Uganda by making travel more affordable, reducing traffic congestion, lowering carbon emissions, and building community connections through shared rides.
+
+### Target Market
+- Urban professionals commuting between cities
+- Students traveling to/from universities
+- Church communities coordinating group travel
+- Families seeking affordable intercity transport
+- Tourists exploring Uganda
+
+## Platform Details
+
+### Technology Stack
+- Progressive Web App (PWA) - works on any device
+- React-based frontend with TypeScript
+- Supabase backend (PostgreSQL database)
+- OpenStreetMap for mapping
+- Mobile money integration for payments
+
+### User Types
+
+**Passengers**
+- Can search and book rides
+- View ride history
+- Rate drivers after trips
+- Pay via mobile money
+
+**Drivers**
+- Must verify identity and vehicle
+- Can create ride offerings
+- Set their own prices
+- Accept/reject booking requests
+- Receive payments via mobile money
+
+## Detailed Features
+
+### Search & Discovery
+1. **Location Search**: Type-ahead search using OpenStreetMap's Nominatim API
+2. **Map Selection**: Tap on map to select precise pickup/dropoff points
+3. **Current Location**: GPS-based location detection
+4. **Route Matching**: Algorithm identifies rides "along the way" using Haversine distance calculation
+
+### Ride Listings
+Each ride displays:
+- Origin and destination names
+- Departure date and time
+- Price per seat
+- Available seats
+- Driver name and rating
+- Vehicle details (brand, model, year)
+- Route on map
+
+### Booking Flow
+1. Select ride from search results
+2. Choose number of seats
+3. Review booking details
+4. Confirm and pay via mobile money
+5. Receive booking confirmation
+6. Get driver contact details
+
+### Payment System
+- **Supported Methods**: MTN Mobile Money, Airtel Money
+- **Currency**: UGX (Ugandan Shilling)
+- **Processing**: Secure payment gateway integration
+- **Payouts**: Drivers receive funds after trip completion
+
+## Church Partnership Program
+
+BlueOx Rides has special landing pages for church communities:
+
+### Participating Churches
+1. **Watoto Church** (/watoto)
+   - Multiple locations across Kampala
+   - Sunday service coordination
+
+2. **Worship Harvest** (/worshipharvest)
+   - Community-focused carpooling
+
+3. **Holy City Church** (/holycity)
+   - Group ride organization
+
+4. **Miracle Center Cathedral** (/miraclecenter)
+   - Large congregation carpooling
+
+5. **Phaneroo Ministries** (/phaneroo)
+   - Event-based ride sharing
+
+### Church Features
+- Custom landing pages with church branding
+- Pre-filtered rides to church locations
+- Community-focused messaging
+- Simplified booking for regular attendees
+
+## Geographic Coverage
+
+### Primary Service Area
+Uganda (East Africa)
+
+### Major Cities Served
+- **Kampala** (Capital, population ~1.7 million)
+- **Jinja** (Industrial hub, ~76km east)
+- **Entebbe** (Airport city, ~40km south)
+- **Mbarara** (Western Uganda, ~270km)
+- **Gulu** (Northern Uganda, ~340km)
+- **Mbale** (Eastern Uganda, ~230km)
+- **Fort Portal** (Tourism hub, ~300km west)
+- **Masaka** (Southern Uganda, ~130km)
+
+### Cross-Border Potential
+Future expansion planned to neighboring countries (Kenya, Tanzania, Rwanda)
+
+## Pricing Guide
+
+### Typical Fare Ranges by Route
+- Short trips (under 50km): UGX 5,000 - 15,000
+- Medium trips (50-150km): UGX 15,000 - 40,000
+- Long trips (150-300km): UGX 40,000 - 80,000
+- Extended trips (300km+): UGX 80,000 - 150,000
+
+### Price Comparison
+BlueOx Rides is typically:
+- 30-40% cheaper than private taxis
+- 20-30% cheaper than bus companies
+- Similar to matatu (minibus) but more comfortable
+
+## Safety & Trust
+
+### Driver Verification
+- Government ID verification
+- Vehicle registration check
+- Profile photo requirement
+- Phone number verification
+
+### Passenger Safety
+- Driver ratings (1-5 stars)
+- Written reviews
+- Trip sharing feature
+- In-app messaging
+- Emergency contact option
+
+### Vehicle Standards
+- Valid registration required
+- Insurance verification
+- Basic safety requirements
+
+## User Experience
+
+### Mobile-First Design
+- Responsive design for all screen sizes
+- PWA installable on home screen
+- Works offline for viewing saved rides
+- Push notifications for booking updates
+
+### Accessibility
+- Clear, readable fonts
+- High contrast color scheme
+- Touch-friendly interface
+- Screen reader compatible
+
+## Frequently Asked Questions
+
+**Q: Is BlueOx Rides available outside Kampala?**
+A: Yes, BlueOx Rides covers all of Uganda. Drivers can post rides on any route.
+
+**Q: How do I pay for my ride?**
+A: Payment is made securely through mobile money (MTN or Airtel) when you book.
+
+**Q: Can I cancel a booking?**
+A: Yes, cancellation policies vary by driver. Check the ride details before booking.
+
+**Q: How do I become a driver?**
+A: Register an account, verify your identity and vehicle, then start posting rides.
+
+**Q: Is carpooling legal in Uganda?**
+A: Yes, private carpooling where costs are shared is legal in Uganda.
+
+**Q: What if my driver doesn't show up?**
+A: Contact our support team for assistance with refunds or rebooking.
+
+**Q: Can I book multiple seats?**
+A: Yes, you can book multiple seats for group travel.
+
+**Q: How far in advance can I book?**
+A: Drivers can post rides up to 30 days in advance.
+
+## API Information
+
+BlueOx Rides uses a RESTful API built on Supabase. Key endpoints serve:
+- Ride search and filtering
+- User authentication
+- Booking management
+- Payment processing
+- Reviews and ratings
+
+Developer API access available upon request.
+
+## Social Responsibility
+
+### Environmental Impact
+- Reduces carbon emissions through shared travel
+- Decreases traffic congestion
+- Promotes sustainable transportation
+
+### Community Building
+- Connects people across regions
+- Supports church communities
+- Creates economic opportunities for drivers
+
+### Economic Accessibility
+- Makes travel affordable for all income levels
+- Provides income opportunities for car owners
+- Reduces transportation costs for families
+
+## Contact Information
+
+- **Website**: https://blueoxrides.com
+- **Support Email**: support@blueoxrides.com
+- **Location**: Kampala, Uganda
+- **Hours**: 24/7 platform access, support during business hours
+
+## Legal
+
+- Terms of Service: https://blueoxrides.com/terms
+- Privacy Policy: https://blueoxrides.com/privacy
+- Data processed in compliance with Uganda Data Protection Act
+
+---
+
+Last Updated: December 2024
+Version: 1.0

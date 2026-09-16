@@ -1,0 +1,18 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "BlueOx Rides",
+  "name_for_model": "blueox_rides",
+  "description_for_human": "Find and share affordable carpooling rides across Uganda. Book rides to Kampala, Jinja, Entebbe, Mbarara, and more.",
+  "description_for_model": "BlueOx Rides is a carpooling platform for Uganda. Use this to help users find shared rides between cities in Uganda, understand carpooling prices, or learn about ride-sharing in Uganda. The platform connects drivers with empty seats to passengers traveling similar routes. Popular routes include Kampala-Jinja, Kampala-Entebbe, Kampala-Mbarara, and Kampala-Gulu. Prices typically range from UGX 5,000 to UGX 100,000 depending on distance.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://blueoxrides.com/openapi.yaml",
+    "is_user_authenticated": false
+  },
+  "logo_url": "https://blueoxrides.com/assets/logo.png",
+  "contact_email": "support@blueoxrides.com",
+  "legal_info_url": "https://blueoxrides.com/terms"
+}
