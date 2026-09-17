@@ -161,7 +161,7 @@ export function RidesMapView({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 bg-background">
+    <div className="fixed inset-0 bottom-16 z-50 bg-background">
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-[1000] bg-background border-b px-4 py-3">
         <PageContainer className="flex items-center justify-between">

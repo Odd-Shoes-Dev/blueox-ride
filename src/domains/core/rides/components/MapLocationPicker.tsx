@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { Button } from '@/shared/ui/button'
-import { X, MapPin, Loader2, Check, Navigation } from 'lucide-react'
+import { X, MapPin, Loader2, Navigation } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { reverseGeocode as reverseGeocodeAdapter } from '@/shared/services/geocoding'
@@ -81,6 +80,34 @@ export function MapLocationPicker({
   const [gettingLocation, setGettingLocation] = useState(false)
 
   const defaultCenter = DEFAULT_MAP_CENTER
+  const markerIcon = createIcon(markerColor === 'pickup' ? '#FF4040' : '#193153')
+
+  // Drop the pin, resolve its address, and push it to the field right away —
+  // no separate confirm step. The modal stays open (map + preview panel
+  // below, same as before) so the user can keep re-tapping to adjust; they
+  // close it manually via the X button whenever they're done, and the field
+  // already reflects whatever was last selected.
+  const selectLocation = async (lat: number, lng: number) => {
+    setSelectedLocation({ lat, lng })
+    setLoading(true)
+
+    let name: string
+    try {
+      name = await reverseGeocodeAdapter(lat, lng)
+    } catch (error) {
+      console.error('Reverse geocoding error:', error)
+      name = `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+    }
+
+    setLocationName(name)
+    setLoading(false)
+    onSelect({ lat, lng, name })
+  }
+
+  // Handle map tap
+  const handleLocationSelect = (lat: number, lng: number) => {
+    selectLocation(lat, lng)
+  }
 
   // Get user's current location
   const getCurrentLocation = () => {
@@ -92,11 +119,10 @@ export function MapLocationPicker({
     setGettingLocation(true)
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const { latitude, longitude } = position.coords
-        setSelectedLocation({ lat: latitude, lng: longitude })
-        reverseGeocode(latitude, longitude)
         setGettingLocation(false)
+        await selectLocation(latitude, longitude)
       },
       (error) => {
         console.error('Geolocation error:', error)
@@ -115,40 +141,6 @@ export function MapLocationPicker({
     )
   }
 
-  const markerIcon = createIcon(markerColor === 'pickup' ? '#FF4040' : '#193153')
-
-  // Reverse geocode to get address from coordinates
-  const reverseGeocode = async (lat: number, lng: number) => {
-    setLoading(true)
-    try {
-      const name = await reverseGeocodeAdapter(lat, lng)
-      setLocationName(name)
-    } catch (error) {
-      console.error('Reverse geocoding error:', error)
-      setLocationName(`${lat.toFixed(4)}, ${lng.toFixed(4)}`)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Handle map tap
-  const handleLocationSelect = (lat: number, lng: number) => {
-    setSelectedLocation({ lat, lng })
-    reverseGeocode(lat, lng)
-  }
-
-  // Handle confirm
-  const handleConfirm = () => {
-    if (selectedLocation && locationName) {
-      onSelect({
-        lat: selectedLocation.lat,
-        lng: selectedLocation.lng,
-        name: locationName,
-      })
-      onClose()
-    }
-  }
-
   // Reset when opening
   useEffect(() => {
     if (isOpen) {
@@ -165,7 +157,7 @@ export function MapLocationPicker({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 bg-background">
+    <div className="fixed inset-0 bottom-16 z-50 bg-background">
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-[1000] bg-background border-b px-4 py-3">
         <PageContainer className="flex items-center justify-between">
@@ -230,41 +222,30 @@ export function MapLocationPicker({
       <div className="absolute bottom-0 left-0 right-0 z-[1000] bg-background border-t p-4">
         <PageContainer className="space-y-3">
           {selectedLocation ? (
-            <>
-              <div className="flex items-start gap-3">
-                <MapPin className={cn(
-                  'w-5 h-5 mt-0.5 flex-shrink-0',
-                  markerColor === 'pickup' ? 'text-coral-500' : 'text-navy-900'
-                )} />
-                <div className="flex-1 min-w-0">
-                  {loading ? (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Finding address...</span>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="font-medium truncate">{locationName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {selectedLocation.lat.toFixed(5)}, {selectedLocation.lng.toFixed(5)}
-                      </p>
-                    </>
-                  )}
-                </div>
+            <div className="flex items-start gap-3">
+              <MapPin className={cn(
+                'w-5 h-5 mt-0.5 flex-shrink-0',
+                markerColor === 'pickup' ? 'text-coral-500' : 'text-navy-900'
+              )} />
+              <div className="flex-1 min-w-0">
+                {loading ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">Finding address...</span>
+                  </div>
+                ) : (
+                  <>
+                    <p className="font-medium truncate">{locationName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedLocation.lat.toFixed(5)}, {selectedLocation.lng.toFixed(5)}
+                    </p>
+                  </>
+                )}
               </div>
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={handleConfirm}
-                disabled={loading || !locationName}
-              >
-                <Check className="w-4 h-4 mr-2" />
-                Confirm Location
-              </Button>
-            </>
+            </div>
           ) : (
             <div className="text-center py-2 text-muted-foreground">
-              <p className="text-sm">Tap anywhere on the map to select a location</p>
+              <p className="text-sm">Tap anywhere on the map to select that location</p>
             </div>
           )}
         </PageContainer>
