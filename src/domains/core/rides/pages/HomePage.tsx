@@ -5,10 +5,12 @@ import { useAuth } from '@/domains/core/auth/AuthContext'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
 import { LocationPicker } from '@/domains/core/rides/components/LocationPicker'
+import { HeroLiveMap } from '@/domains/core/rides/components/HeroLiveMap'
 import { HomePageSEO } from '@/shared/components/SEO'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { formatCurrency, formatDate } from '@/shared/lib/utils'
-import { Search, Calendar, Users, Star, Plus, ArrowRight, RefreshCw, Shield, Wallet, UserCheck, MessageSquare } from 'lucide-react'
+import { reverseGeocode } from '@/shared/services/geocoding'
+import { Search, Calendar, Users, Star, Plus, ArrowRight, RefreshCw, Shield, Wallet, UserCheck, MessageSquare, Loader2, MapPin } from 'lucide-react'
 import type { BrandColors } from '@/shared/types/branding'
 
 interface Location {
@@ -20,10 +22,6 @@ interface Location {
 type RideWithDriver = ridesRepository.RideWithDriverRow
 
 interface HomePageProps {
-  // Optional hero copy customization (for church landing pages)
-  heroHeadline?: string
-  heroSubtext?: string
-  loggedInPrompt?: string
   // Optional brand colors for church theming
   brandColors?: BrandColors
   churchName?: string
@@ -32,9 +30,6 @@ interface HomePageProps {
 }
 
 export default function HomePage({
-  heroHeadline = 'Travel together, pay less',
-  heroSubtext = 'From your daily commute to trips upcountry — find trusted drivers going your way',
-  loggedInPrompt = 'Where are you heading today?',
   brandColors,
   churchName,
   churchLogoUrl,
@@ -42,6 +37,9 @@ export default function HomePage({
   const { user, profile } = useAuth()
   const [searchOrigin, setSearchOrigin] = useState<Location | null>(null)
   const [searchDestination, setSearchDestination] = useState<Location | null>(null)
+  const [locatingUser, setLocatingUser] = useState(true)
+  const [geoFailed, setGeoFailed] = useState(false)
+  const [manualPickupOverride, setManualPickupOverride] = useState(false)
   const [rides, setRides] = useState<RideWithDriver[]>([])
   const [openRequestCount, setOpenRequestCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -110,6 +108,13 @@ export default function HomePage({
       .catch(() => setOpenRequestCount(null))
   }, [])
 
+  // Auto-detected pickup is a full reverse-geocoded address (e.g. "Kampala
+  // Road, Kampala"), which rarely appears verbatim in a driver-typed
+  // origin_name — filtering on it would silently return nothing. Only use
+  // the origin as a text filter once the user (or the geo-fallback form)
+  // explicitly picked it themselves.
+  const usingAutoPickup = !geoFailed && !manualPickupOverride
+
   const searchRides = async () => {
     // Prevent search if already searching
     if (searching) return
@@ -121,7 +126,7 @@ export default function HomePage({
     try {
       const data = await withTimeout(
         ridesRepository.searchActiveRides({
-          originName: searchOrigin?.name,
+          originName: usingAutoPickup ? undefined : searchOrigin?.name,
           destinationName: searchDestination?.name,
           limit: 50,
         }),
@@ -142,6 +147,18 @@ export default function HomePage({
     }
   }
 
+  const handleHeroLocationFound = (coords: { lat: number; lng: number }) => {
+    reverseGeocode(coords.lat, coords.lng)
+      .then((name) => setSearchOrigin({ ...coords, name }))
+      .catch(() => setSearchOrigin({ ...coords, name: 'Current location' }))
+      .finally(() => setLocatingUser(false))
+  }
+
+  const handleHeroLocationUnavailable = () => {
+    setGeoFailed(true)
+    setLocatingUser(false)
+  }
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     searchRides()
@@ -151,156 +168,145 @@ export default function HomePage({
     <>
       <HomePageSEO />
       <div className="min-h-screen bg-background pb-24">
-        {/* Hero Section */}
-      <div 
-        className={`pt-8 pb-10 px-4 ${!brandStyles.isCustom ? brandStyles.heroGradient : ''}`}
-        style={brandStyles.isCustom && brandColors ? {
-          background: `linear-gradient(to bottom, ${brandColors.primary}, ${brandColors.primaryDark})`,
-        } : undefined}
-      >
-        <PageContainer>
-          {/* Header with Logo */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <img
-                src="/assets/logo1.png"
-                alt="Blue OX Rides"
-                className="w-12 h-12 object-contain"
-              />
-              <div className="flex flex-col">
-                <span className="text-white font-bold text-lg">Blue OX Rides</span>
-                {churchName && (
-                  <span 
-                    className="text-xs font-medium"
-                    style={{ color: brandColors?.heroSubtext || '#ffe0e0' }}
-                  >
-                    for {churchName}
-                  </span>
-                )}
-              </div>
-            </div>
-            {user ? (
-              <Link to="/profile">
-                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold">
-                  {profile?.full_name?.[0]?.toUpperCase() || '?'}
-                </div>
-              </Link>
-            ) : (
-              <Link to="/login">
-                <div className="px-4 py-2 rounded-full bg-white/20 text-white text-sm font-medium hover:bg-white/30 transition-colors">
-                  Sign In
-                </div>
-              </Link>
-            )}
-          </div>
+        {/* Hero Section — full-bleed live map, Google-Maps-style floating
+            controls (small opaque pills, never text/cards translucent over
+            the map itself, so nothing ever blends in regardless of theme
+            or what's under it). No headline here by design — just map + search. */}
+      <div className="relative h-[75vh] min-h-[520px] max-h-[760px] overflow-hidden">
+        <HeroLiveMap
+          rides={rides}
+          className="absolute inset-0"
+          onLocationFound={handleHeroLocationFound}
+          onLocationUnavailable={handleHeroLocationUnavailable}
+        />
 
-          {/* Church Logo Banner - shown for church landing pages */}
-          {churchName && (
-            <div className="flex items-center justify-center mb-4">
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 flex items-center gap-3">
-                {churchLogoUrl ? (
-                  <img
-                    src={churchLogoUrl}
-                    alt={`${churchName} logo`}
-                    className="h-10 w-auto max-w-[140px] object-contain"
-                    onError={(e) => {
-                      // Hide the image if it fails to load
-                      (e.target as HTMLImageElement).style.display = 'none'
-                    }}
-                  />
-                ) : (
-                  <div 
-                    className="text-sm font-semibold"
-                    style={{ color: brandColors?.accent || '#F5A623' }}
-                  >
-                    {churchName}
-                  </div>
-                )}
-                <div className="h-6 w-px bg-white/30" />
-                <span 
-                  className="text-xs"
-                  style={{ color: brandColors?.heroSubtext || '#ffe0e0' }}
-                >
-                  Official Partner
-                </span>
+        {/* Top row: logo pill (left) + sign-in/avatar pill (right) */}
+        <div className="absolute top-4 inset-x-4 z-20 flex items-center justify-between">
+          <div className="flex items-center gap-2 bg-white rounded-full pl-2 pr-4 py-2 shadow-lg">
+            <img
+              src="/assets/logo1.png"
+              alt="Blue OX Rides"
+              className="w-7 h-7 object-contain"
+            />
+            <span className="font-bold text-navy-900 text-sm">Blue OX Rides</span>
+          </div>
+          {user ? (
+            <Link to="/profile">
+              <div className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center text-navy-900 font-semibold">
+                {profile?.full_name?.[0]?.toUpperCase() || '?'}
               </div>
-            </div>
+            </Link>
+          ) : (
+            <Link to="/login">
+              <div className="px-4 py-2.5 rounded-full bg-white shadow-lg text-navy-900 text-sm font-medium hover:bg-muted transition-colors">
+                Sign In
+              </div>
+            </Link>
           )}
+        </div>
 
-          {/* Hero Message */}
-          <div className="text-center mb-6">
-            {user ? (
-              <div>
-                <p 
-                  className="text-sm mb-1"
-                  style={{ color: brandColors?.heroSubtext || '#ffe0e0' }}
-                >
-                  Welcome back,
-                </p>
-                <h1 
-                  className="text-2xl font-bold"
-                  style={{ color: brandColors?.heroText || '#ffffff' }}
-                >
-                  {profile?.full_name?.split(' ')[0] || 'Traveler'}
-                </h1>
-                <p 
-                  className="mt-2"
-                  style={{ color: brandColors?.heroSubtext || '#ffe0e0' }}
-                >
-                  {loggedInPrompt}
-                </p>
-              </div>
-            ) : (
-              <div>
-                <h1 
-                  className="text-2xl font-bold mb-2"
-                  style={{ color: brandColors?.heroText || '#ffffff' }}
-                >
-                  {heroHeadline}
-                </h1>
-                <p 
-                  className="text-base"
-                  style={{ color: brandColors?.heroSubtext || '#ffe0e0' }}
-                >
-                  {heroSubtext}
-                </p>
-              </div>
-            )}
+        {/* Church banner - its own floating pill, below the top row */}
+        {churchName && (
+          <div className="absolute top-20 inset-x-4 z-10 flex justify-center">
+            <div className="inline-flex items-center gap-3 bg-white rounded-xl px-4 py-2 shadow-lg">
+              {churchLogoUrl ? (
+                <img
+                  src={churchLogoUrl}
+                  alt={`${churchName} logo`}
+                  className="h-8 w-auto max-w-[120px] object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none'
+                  }}
+                />
+              ) : (
+                <div className="text-sm font-semibold" style={{ color: brandColors?.accent || '#F5A623' }}>
+                  {churchName}
+                </div>
+              )}
+              <div className="h-5 w-px bg-border" />
+              <span className="text-xs text-muted-foreground">Official Partner</span>
+            </div>
           </div>
+        )}
 
-          {/* Search Box */}
-          <Card className="shadow-lg">
-            <CardContent className="p-4">
-              <form onSubmit={handleSearch} className="space-y-3">
-                <LocationPicker
-                  value={searchOrigin}
-                  onChange={setSearchOrigin}
-                  placeholder="Leaving from..."
-                  markerColor="pickup"
-                />
-                <LocationPicker
-                  value={searchDestination}
-                  onChange={setSearchDestination}
-                  placeholder="Going to..."
-                  markerColor="dropoff"
-                />
-                <Button type="submit" className="w-full" size="lg" disabled={searching}>
-                  {searching ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                      Searching...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="w-4 h-4 mr-2" />
-                      Find a Ride
-                    </>
-                  )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </PageContainer>
+        {/* Search widget — floating opaque card directly on the map */}
+        <div className={`absolute inset-x-4 z-20 ${churchName ? 'top-36' : 'top-20'}`}>
+          <div className="max-w-md mx-auto">
+            <Card className="shadow-xl bg-white border-0">
+              <CardContent className="p-4">
+                {locatingUser ? (
+                  <div className="flex items-center gap-2 text-muted-foreground py-2 text-sm">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Finding your location...
+                  </div>
+                ) : usingAutoPickup && searchOrigin ? (
+                  <form onSubmit={handleSearch} className="space-y-2">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+                      <span className="flex items-center gap-1 truncate">
+                        <MapPin className="w-3 h-3 flex-shrink-0 text-coral-500" />
+                        <span className="truncate">From {searchOrigin.name}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setManualPickupOverride(true)}
+                        className="text-primary underline flex-shrink-0 ml-2"
+                      >
+                        Change
+                      </button>
+                    </div>
+                    <LocationPicker
+                      value={searchDestination}
+                      onChange={setSearchDestination}
+                      placeholder="Where are you going?"
+                      markerColor="dropoff"
+                    />
+                    <Button type="submit" className="w-full" size="lg" disabled={searching || !searchDestination}>
+                      {searching ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                          Searching...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="w-4 h-4 mr-2" />
+                          Find a Ride
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleSearch} className="space-y-3">
+                    <LocationPicker
+                      value={searchOrigin}
+                      onChange={setSearchOrigin}
+                      placeholder="Leaving from..."
+                      markerColor="pickup"
+                    />
+                    <LocationPicker
+                      value={searchDestination}
+                      onChange={setSearchDestination}
+                      placeholder="Going to..."
+                      markerColor="dropoff"
+                    />
+                    <Button type="submit" className="w-full" size="lg" disabled={searching}>
+                      {searching ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                          Searching...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="w-4 h-4 mr-2" />
+                          Find a Ride
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
 
       {/* Value Props - Only show to non-logged in users */}

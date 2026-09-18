@@ -42,9 +42,6 @@ export default function ChurchLandingPage() {
         />
       )}
       <HomePage
-        heroHeadline={copy.heroHeadline}
-        heroSubtext={copy.heroSubtext}
-        loggedInPrompt={copy.loggedInPrompt}
         brandColors={isKnownChurch ? copy.brandColors : undefined}
         churchName={isKnownChurch ? copy.churchName : undefined}
         churchLogoUrl={isKnownChurch ? copy.logoUrl : undefined}
