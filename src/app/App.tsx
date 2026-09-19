@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from '@/domains/core/auth/AuthContext'
 import { ThemeProvider } from '@/shared/contexts/ThemeContext'
 import { Toaster } from '@/shared/ui/toaster'
 import { BottomNav } from '@/app/BottomNav'
+import { SiteLogoLayout } from '@/app/SiteLogoLayout'
 
 // Pages
 import HomePage from '@/domains/core/rides/pages/HomePage'
@@ -83,12 +84,16 @@ function AppRoutes() {
   return (
     <AppLayout>
       <Routes>
+        {/* Landing page has its own logo, so it sits outside the logo layout */}
+        <Route path="/" element={<HomePage />} />
+
+        {/* Every other page gets the corner logo (home shortcut) from SiteLogoLayout */}
+        <Route element={<SiteLogoLayout />}>
         {/* Auth routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
         {/* PUBLIC routes - anyone can browse */}
-        <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/rides/:id" element={<RideDetailsPage />} />
         <Route path="/requests" element={<RideRequestsPage />} />
@@ -146,6 +151,7 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        </Route>
 
         {/* Church-specific landing pages - must be after all static routes */}
         {/* Routes: /watoto, /worshipharvest, /holycity, /miraclecenter, /phaneroo */}

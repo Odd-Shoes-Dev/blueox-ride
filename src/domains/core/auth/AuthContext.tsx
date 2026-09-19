@@ -109,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for auth changes
     const { data: { subscription } } = authRepository.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (!isMounted) return
 
         // Handle specific auth events
@@ -121,13 +121,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null)
 
         if (session?.user) {
-          const fullName = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User'
-          const profileData = await fetchProfile(session.user.id, session.user.email, fullName)
-          if (isMounted) setProfile(profileData)
+          const sessionUser = session.user
+          // Deliberately deferred with setTimeout instead of awaited here: Supabase runs
+          // this callback while holding its internal auth lock, and any Supabase query
+          // needs that same lock to fetch the access token — so awaiting the profile
+          // query inside the callback deadlocks until our 10s timeout fires.
+          // https://supabase.com/docs/reference/javascript/auth-onauthstatechange
+          setTimeout(async () => {
+            const fullName = sessionUser.user_metadata?.full_name || sessionUser.email?.split('@')[0] || 'User'
+            const profileData = await fetchProfile(sessionUser.id, sessionUser.email, fullName)
+            if (isMounted) {
+              setProfile(profileData)
+              setLoading(false)
+            }
+          }, 0)
         } else {
           setProfile(null)
+          setLoading(false)
         }
-        setLoading(false)
       }
     )
 

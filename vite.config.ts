@@ -14,8 +14,8 @@ export default defineConfig({
         name: 'BlueOx Rides',
         short_name: 'BlueOx',
         description: 'Share rides, save money, travel together across Uganda',
-        theme_color: '#5f6e4b',
-        background_color: '#f6f7f4',
+        theme_color: '#193153', // brand navy — same as the theme-color meta tag in index.html
+        background_color: '#f9fafc', // matches the app's light background (splash screen colour)
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
