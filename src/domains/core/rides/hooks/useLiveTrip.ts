@@ -5,6 +5,7 @@ import {
   type LocationBroadcaster,
 } from '@/shared/services/database'
 import type { LivePosition, LiveTrip, PreviewableRide } from '@/domains/core/rides/map/MapShellContext'
+import { bearingDegrees, haversineKm } from '@/domains/core/rides/lib/routeProgress'
 
 // The driver's position is sent to passengers this often. Their own dot updates on
 // every GPS fix; only the broadcast is throttled (no need to flood the channel).
@@ -26,6 +27,25 @@ export function useLiveTrip() {
   const broadcasterRef = useRef<LocationBroadcaster | null>(null)
   const unsubscribeRef = useRef<(() => void) | null>(null)
   const lastSendRef = useRef(0)
+  const lastFixRef = useRef<{ lat: number; lng: number } | null>(null)
+  const lastHeadingRef = useRef<number | undefined>(undefined)
+
+  // Which way the vehicle is pointing. GPS reports a heading only while moving (and
+  // not on every device), so otherwise work it out from the last two positions, and
+  // keep the last known direction while stopped rather than snapping back to "unknown".
+  const resolveHeading = useCallback((lat: number, lng: number, reported: number | null | undefined): number | undefined => {
+    const here = { lat, lng }
+    if (typeof reported === 'number' && !Number.isNaN(reported)) {
+      lastHeadingRef.current = reported
+      lastFixRef.current = here
+    } else if (!lastFixRef.current) {
+      lastFixRef.current = here
+    } else if (haversineKm(lastFixRef.current, here) * 1000 > 5) {
+      lastHeadingRef.current = bearingDegrees(lastFixRef.current, here)
+      lastFixRef.current = here
+    }
+    return lastHeadingRef.current
+  }, [])
 
   const teardown = useCallback(() => {
     if (watchIdRef.current !== null) {
@@ -37,6 +57,8 @@ export function useLiveTrip() {
     unsubscribeRef.current?.()
     unsubscribeRef.current = null
     liveTripRef.current = null
+    lastFixRef.current = null
+    lastHeadingRef.current = undefined
   }, [])
 
   const stopLiveTrip = useCallback(() => {
@@ -65,7 +87,7 @@ export function useLiveTrip() {
 
       watchIdRef.current = navigator.geolocation.watchPosition(
         (position) => {
-          const heading = position.coords.heading ?? undefined
+          const heading = resolveHeading(position.coords.latitude, position.coords.longitude, position.coords.heading)
           setLivePosition({
             lat: position.coords.latitude,
             lng: position.coords.longitude,
@@ -100,7 +122,7 @@ export function useLiveTrip() {
         { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 }
       )
     },
-    [teardown]
+    [teardown, resolveHeading]
   )
 
   const watchDriver = useCallback(
@@ -116,10 +138,11 @@ export function useLiveTrip() {
       setLiveError(null)
 
       unsubscribeRef.current = subscribeToDriverLocation(ride.id, (update) => {
-        setLivePosition({ lat: update.lat, lng: update.lng, heading: update.heading, updatedAt: Date.now() })
+        const heading = resolveHeading(update.lat, update.lng, update.heading)
+        setLivePosition({ lat: update.lat, lng: update.lng, heading, updatedAt: Date.now() })
       })
     },
-    [teardown]
+    [teardown, resolveHeading]
   )
 
   // Keep the screen awake while driving a trip: a dimmed or locked screen makes the
