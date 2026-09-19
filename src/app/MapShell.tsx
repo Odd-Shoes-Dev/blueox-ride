@@ -69,10 +69,11 @@ function MapShellLayout({ panels }: MapShellProps) {
     panelOpen && !placingPin ? 'h-[calc(45dvh-4rem)] md:h-[calc(100dvh-4rem)]' : 'h-[calc(100dvh-4rem)]'
   )
 
-  // Pins on the map: the home screen's trip, or whatever the open panel registered.
-  const pins = isPanel
-    ? shell.panelPins
-    : { origin: shell.usingAutoPickup ? null : shell.origin, destination: shell.destination }
+  // Pins on the map: the trip the user searched for (pickup, destination, and the dashed line
+  // between them) stays on the map on EVERY screen — browsing results, opening a ride, and so on.
+  // A panel that plans its own trip (Offer a Ride, Request a Ride, Search) shows its own pins instead.
+  const tripPins = { origin: shell.usingAutoPickup ? null : shell.origin, destination: shell.destination }
+  const pins = isPanel ? (shell.panelPins ?? tripPins) : tripPins
 
   const initials = (profile?.full_name || user?.email || '?')
     .split(' ')
@@ -80,6 +81,19 @@ function MapShellLayout({ panels }: MapShellProps) {
     .join('')
     .toUpperCase()
     .substring(0, 2)
+
+  // On the results screen, the map shows the found rides (not the general list) and
+  // frames them together with the trip's ends.
+  const showingResults = pathname === '/results' && shell.results !== null
+  const resultPoints: [number, number][] = showingResults
+    ? [
+        ...shell.results!.rides.map((ride): [number, number] => [ride.origin_lat, ride.origin_lng]),
+        ...(shell.results!.origin ? [[shell.results!.origin.lat, shell.results!.origin.lng] as [number, number]] : []),
+        ...(shell.results!.destination
+          ? [[shell.results!.destination.lat, shell.results!.destination.lng] as [number, number]]
+          : []),
+      ]
+    : []
 
   const scrollPastMap = () => {
     // The map fills the screen minus the 4rem bottom nav.
@@ -89,14 +103,15 @@ function MapShellLayout({ panels }: MapShellProps) {
   return (
     <div className="relative">
       <HeroLiveMap
-        rides={shell.rides}
+        rides={showingResults ? shell.results!.rides : shell.rides}
+        fitPoints={showingResults ? { points: resultPoints, token: shell.results!.token } : null}
         className={mapFrame}
         onLocationFound={shell.handleLocationFound}
         onLocationUnavailable={shell.handleLocationUnavailable}
         origin={pins?.origin ?? null}
         destination={pins?.destination ?? null}
         myRides={shell.myRides}
-        featured={isPanel && !shell.previewedRideId ? null : shell.featured}
+        featured={isPanel && shell.featured?.isDefault ? null : shell.featured}
         onSelectRide={shell.selectRide}
         onDeselectRide={shell.deselectRide}
         driver={shell.livePosition}

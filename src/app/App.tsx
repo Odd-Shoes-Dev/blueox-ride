@@ -19,6 +19,7 @@ import MyRidesPage from '@/domains/core/rides/pages/MyRidesPage'
 import SearchPage from '@/domains/core/rides/pages/SearchPage'
 import RideRequestsPage from '@/domains/core/rides/pages/RideRequestsPage'
 import RequestRidePage from '@/domains/core/rides/pages/RequestRidePage'
+import SearchResultsPage from '@/domains/core/rides/pages/SearchResultsPage'
 import ChurchLandingPage from '@/domains/church/ChurchLandingPage'
 import AdminChurchPayoutsPage from '@/domains/church/AdminChurchPayoutsPage'
 import PrivacyPolicyPage from '@/domains/core/legal/PrivacyPolicyPage'
@@ -69,6 +70,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 // `title` names the panel on the button that reopens it after it has been hidden.
 const PANEL_ROUTES: { path: string; title: string; element: React.ReactNode }[] = [
   { path: '/search', title: 'Search rides', element: <SearchPage /> },
+  { path: '/results', title: 'Ride results', element: <SearchResultsPage /> },
   { path: '/rides/:id', title: 'Ride details', element: <RideDetailsPage /> },
   { path: '/requests', title: 'Ride requests', element: <RideRequestsPage /> },
   { path: '/rides/create', title: 'Offer a ride', element: <ProtectedRoute><CreateRidePage /></ProtectedRoute> },

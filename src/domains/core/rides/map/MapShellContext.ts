@@ -35,6 +35,27 @@ export interface FeaturedRoute {
   summary: { distanceKm: number; durationMin: number } | null
   // Zoom the map to fit the route (true when previewing a tapped ride)
   fit: boolean
+  // True for the fallback (the driver's own next ride) rather than a ride the user chose
+  isDefault: boolean
+}
+
+// How close a found ride is to what was searched for (null = that end wasn't searched)
+export interface RideMatch {
+  originKm: number | null
+  destinationKm: number | null
+}
+export type RideResult = RideWithDriver & { match: RideMatch }
+
+// The outcome of "Find a Ride": rides that start near the pickup and end near the
+// destination, nearest first.
+export interface SearchResults {
+  rides: RideResult[]
+  origin: PlacedPoint | null
+  destination: PlacedPoint | null
+  radiusKm: number
+  date?: string
+  // Changes with every search, so the map knows to re-fit itself
+  token: number
 }
 
 // A vehicle position being followed live (the driver's own, or the driver as seen by a passenger)
@@ -64,7 +85,10 @@ export interface MapShellValue {
   searching: boolean
   ridesError: string | null
   refreshRides: () => Promise<void>
-  searchRides: () => Promise<void>
+  // Find rides near the pickup and destination (by distance, not by name)
+  searchRides: (options?: { radiusKm?: number; date?: string }) => Promise<void>
+  results: SearchResults | null
+  clearResults: () => void
 
   // The signed-in driver's own upcoming rides (soonest first), and the route being previewed
   myRides: RideWithDriver[]
