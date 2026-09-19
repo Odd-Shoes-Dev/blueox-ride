@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, Outlet, matchPath, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown, Search } from 'lucide-react'
+import { Link, Outlet, matchPath, useLocation } from 'react-router-dom'
+import { ChevronDown, Menu, Search } from 'lucide-react'
 import { useAuth } from '@/domains/core/auth/AuthContext'
 import { HeroLiveMap } from '@/domains/core/rides/components/HeroLiveMap'
 import { MapPlaceSearch } from '@/domains/core/rides/components/MapPlaceSearch'
@@ -19,9 +19,10 @@ import { MapPanel } from '@/app/MapPanel'
 const GLASS = 'bg-white/80 border border-white/50 shadow-lg pointer-events-auto'
 
 interface MapShellProps {
-  // Routes that open as a panel over the map. Every other route rendered inside
-  // the shell is the home screen (landing page, church pages).
-  panelPaths: string[]
+  // Routes that open as a panel over the map, and the name shown on the button
+  // that reopens each one. Every other route rendered inside the shell is the
+  // home screen (landing page, church pages).
+  panels: { path: string; title: string }[]
 }
 
 // Layout route for the whole app experience: ONE map that stays mounted, with
@@ -29,23 +30,30 @@ interface MapShellProps {
 // everything else opens as a side panel (desktop) or bottom sheet (phones).
 // Because the map never unmounts, moving between screens doesn't reload it or
 // ask for the user's location again.
-export function MapShell({ panelPaths }: MapShellProps) {
+export function MapShell({ panels }: MapShellProps) {
   return (
     <MapShellProvider>
-      <MapShellLayout panelPaths={panelPaths} />
+      <MapShellLayout panels={panels} />
     </MapShellProvider>
   )
 }
 
-function MapShellLayout({ panelPaths }: MapShellProps) {
-  const { pathname } = useLocation()
-  const navigate = useNavigate()
+function MapShellLayout({ panels }: MapShellProps) {
+  const { pathname, key: locationKey } = useLocation()
   const shell = useMapShell()
   const { user, profile } = useAuth()
   const [placeSearchOpen, setPlaceSearchOpen] = useState(false)
 
-  const isPanel = panelPaths.some((path) => matchPath({ path, end: true }, pathname))
+  const panel = panels.find((candidate) => matchPath({ path: candidate.path, end: true }, pathname))
+  const isPanel = panel !== undefined
   const placingPin = shell.editing !== null
+
+  // Hiding a panel keeps it mounted (forms, scroll position and all) and leaves the URL
+  // alone; a button by the logo brings it straight back. Tied to this particular visit
+  // (location.key), so opening the same screen again later starts with it showing.
+  const [collapsedFor, setCollapsedFor] = useState<string | null>(null)
+  const collapsed = isPanel && collapsedFor === locationKey
+  const panelOpen = isPanel && !collapsed
 
   // A new screen always starts at the top.
   useEffect(() => {
@@ -57,8 +65,8 @@ function MapShellLayout({ panelPaths }: MapShellProps) {
   // While placing a pin on a phone the sheet hides, so the map takes the full height.
   const mapFrame = cn(
     'fixed top-0 right-0 left-0',
-    isPanel && 'md:left-[420px]',
-    isPanel && !placingPin ? 'h-[calc(45dvh-4rem)] md:h-[calc(100dvh-4rem)]' : 'h-[calc(100dvh-4rem)]'
+    panelOpen && 'md:left-[420px]',
+    panelOpen && !placingPin ? 'h-[calc(45dvh-4rem)] md:h-[calc(100dvh-4rem)]' : 'h-[calc(100dvh-4rem)]'
   )
 
   // Pins on the map: the home screen's trip, or whatever the open panel registered.
@@ -111,6 +119,7 @@ function MapShellLayout({ panelPaths }: MapShellProps) {
           isPanel ? 'top-2 inset-x-3' : 'top-4 inset-x-4'
         )}
       >
+        <div className="flex items-center gap-2">
         <Link
           to="/"
           aria-label="Blue OX Rides home"
@@ -124,6 +133,24 @@ function MapShellLayout({ panelPaths }: MapShellProps) {
           <img src="/assets/logo1.png" alt="" className={isPanel ? 'w-6 h-6 object-contain' : 'w-7 h-7 object-contain'} />
           {!isPanel && <span className="font-bold text-navy-900 text-sm">Blue OX Rides</span>}
         </Link>
+
+        {/* Brings back a hidden panel exactly as it was left */}
+        {collapsed && (
+          <button
+            type="button"
+            onClick={() => setCollapsedFor(null)}
+            aria-label={`Show ${panel?.title ?? 'panel'}`}
+            className={cn(
+              'flex items-center gap-2 rounded-full h-9 pl-3 pr-4 text-sm font-medium text-navy-900 hover:bg-white/90 transition-colors',
+              GLASS,
+              placeSearchOpen && 'max-sm:hidden'
+            )}
+          >
+            <Menu className="w-4 h-4" />
+            <span className="truncate max-w-[9rem]">{panel?.title}</span>
+          </button>
+        )}
+        </div>
 
         {/* Right cluster. Search is a place finder for the map only: it expands
             into a field, and picking a result just moves the map there. On
@@ -181,7 +208,7 @@ function MapShellLayout({ panelPaths }: MapShellProps) {
         <div
           className={cn(
             'fixed top-14 right-0 left-0 z-[44] flex justify-center px-3 pointer-events-none',
-            isPanel && 'md:left-[420px]'
+            panelOpen && 'md:left-[420px]'
           )}
         >
           <TripBar
@@ -197,7 +224,7 @@ function MapShellLayout({ panelPaths }: MapShellProps) {
       {/* On panel screens the previewed route's chip sits at the top of the visible map.
           (On the home screen it's part of the search card's stack instead.) */}
       {isPanel && shell.previewedRide && !placingPin && !(shell.liveTrip && shell.liveTrip.ride.id === shell.previewedRide.id) && (
-        <div className="fixed top-36 right-0 left-0 md:left-[420px] z-[43] flex justify-center px-3 pointer-events-none">
+        <div className={cn('fixed top-36 right-0 left-0 z-[43] flex justify-center px-3 pointer-events-none', panelOpen && 'md:left-[420px]')}>
           <RoutePreviewChip
             origin={shell.previewedRide.origin_name}
             destination={shell.previewedRide.destination_name}
@@ -209,7 +236,12 @@ function MapShellLayout({ panelPaths }: MapShellProps) {
       )}
 
       {isPanel ? (
-        <MapPanel key={pathname} onClose={() => navigate('/')} hideOnMobile={placingPin}>
+        <MapPanel
+          key={pathname}
+          onCollapse={() => setCollapsedFor(locationKey)}
+          collapsed={collapsed}
+          hideOnMobile={placingPin}
+        >
           <Outlet />
         </MapPanel>
       ) : (

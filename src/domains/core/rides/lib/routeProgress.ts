@@ -15,6 +15,17 @@ export function haversineKm(a: LatLng, b: LatLng): number {
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h))
 }
 
+// Compass direction (0-360°, 0 = north) you'd travel to get from one point to another.
+export function bearingDegrees(from: LatLng, to: LatLng): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180
+  const dLng = toRad(to.lng - from.lng)
+  const y = Math.sin(dLng) * Math.cos(toRad(to.lat))
+  const x =
+    Math.cos(toRad(from.lat)) * Math.sin(toRad(to.lat)) -
+    Math.sin(toRad(from.lat)) * Math.cos(toRad(to.lat)) * Math.cos(dLng)
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360
+}
+
 export interface RouteMeasure {
   cumulativeKm: number[] // distance from the start to each point
   totalKm: number

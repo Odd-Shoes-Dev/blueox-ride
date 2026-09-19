@@ -66,14 +66,15 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
 // Screens that open as a panel over the map (see MapShell). Anything not listed
 // here and not standalone below is the home screen. Order doesn't matter.
-const PANEL_ROUTES: { path: string; element: React.ReactNode }[] = [
-  { path: '/search', element: <SearchPage /> },
-  { path: '/rides/:id', element: <RideDetailsPage /> },
-  { path: '/requests', element: <RideRequestsPage /> },
-  { path: '/rides/create', element: <ProtectedRoute><CreateRidePage /></ProtectedRoute> },
-  { path: '/requests/new', element: <ProtectedRoute><RequestRidePage /></ProtectedRoute> },
-  { path: '/my-rides', element: <ProtectedRoute><MyRidesPage /></ProtectedRoute> },
-  { path: '/profile', element: <ProtectedRoute><ProfilePage /></ProtectedRoute> },
+// `title` names the panel on the button that reopens it after it has been hidden.
+const PANEL_ROUTES: { path: string; title: string; element: React.ReactNode }[] = [
+  { path: '/search', title: 'Search rides', element: <SearchPage /> },
+  { path: '/rides/:id', title: 'Ride details', element: <RideDetailsPage /> },
+  { path: '/requests', title: 'Ride requests', element: <RideRequestsPage /> },
+  { path: '/rides/create', title: 'Offer a ride', element: <ProtectedRoute><CreateRidePage /></ProtectedRoute> },
+  { path: '/requests/new', title: 'Request a ride', element: <ProtectedRoute><RequestRidePage /></ProtectedRoute> },
+  { path: '/my-rides', title: 'My rides', element: <ProtectedRoute><MyRidesPage /></ProtectedRoute> },
+  { path: '/profile', title: 'Profile', element: <ProtectedRoute><ProfilePage /></ProtectedRoute> },
 ]
 
 function AppRoutes() {
@@ -100,7 +101,7 @@ function AppRoutes() {
         {/* One persistent map with every screen shown on top of it: the home
             screen scrolls over the map, the rest open as a side panel (desktop)
             or bottom sheet (phones). Moving between them never reloads the map. */}
-        <Route element={<MapShell panelPaths={PANEL_ROUTES.map((route) => route.path)} />}>
+        <Route element={<MapShell panels={PANEL_ROUTES.map(({ path, title }) => ({ path, title }))} />}>
           <Route path="/" element={<HomePage />} />
           {PANEL_ROUTES.map((route) => (
             <Route key={route.path} path={route.path} element={route.element} />

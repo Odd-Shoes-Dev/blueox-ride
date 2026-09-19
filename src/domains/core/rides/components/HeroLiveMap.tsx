@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, ZoomControl, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
@@ -43,7 +43,7 @@ interface HeroLiveMapProps {
   destination?: PlacedPoint | null
   // A live vehicle position to show and follow, how close to zoom when it first appears,
   // and whether to hide the user's own dot (while they are the one driving, the car is them).
-  driver?: { lat: number; lng: number } | null
+  driver?: { lat: number; lng: number; heading?: number } | null
   driverZoom?: number
   hideUserLocation?: boolean
   // Which pin (if any) is currently being placed. While set, the map shows a
@@ -119,13 +119,31 @@ const userIcon = L.divIcon({
   iconAnchor: [9, 9],
 })
 
-// The vehicle you are tracking: a car in a navy disc, distinct from the blue "you are here" dot.
-const driverIcon = L.divIcon({
-  className: 'hero-driver-marker',
-  html: `<div style="width:34px;height:34px;border-radius:50%;background:#193153;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;">🚗</div>`,
-  iconSize: [34, 34],
-  iconAnchor: [17, 17],
-})
+// The vehicle being tracked, drawn like a navigation arrow: it points the way the vehicle is
+// heading (rotated by `heading`, in degrees from north). Until a direction is known —
+// stationary at the start — it is a plain pulsing dot, then turns into the arrow once moving.
+function makeDriverIcon(heading: number | null): L.DivIcon {
+  const arrow =
+    heading === null
+      ? `<div style="position:relative;width:22px;height:22px;">
+           <div style="position:absolute;inset:0;border-radius:50%;background:#2563EB;opacity:.3;animation:driver-pulse 1.8s ease-out infinite;"></div>
+           <div style="position:absolute;top:4px;left:4px;width:14px;height:14px;border-radius:50%;background:#2563EB;border:3px solid white;box-shadow:0 1px 5px rgba(0,0,0,.45);"></div>
+           <style>@keyframes driver-pulse { 0% { transform: scale(.8); opacity: .5; } 100% { transform: scale(2.4); opacity: 0; } }</style>
+         </div>`
+      : `<div style="width:44px;height:44px;transform:rotate(${heading}deg);">
+           <svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" style="display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45));">
+             <circle cx="22" cy="22" r="19" fill="#2563EB" opacity=".18"/>
+             <path d="M22 6 L34 36 L22 29.5 L10 36 Z" fill="#2563EB" stroke="white" stroke-width="2.5" stroke-linejoin="round"/>
+           </svg>
+         </div>`
+  const size = heading === null ? 22 : 44
+  return L.divIcon({
+    className: 'hero-driver-marker',
+    html: arrow,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  })
+}
 
 const DEFAULT_ZOOM = 12 // city-wide view, used until we know exactly where the visitor is
 
@@ -511,6 +529,10 @@ export function HeroLiveMap({
     if (latest && map) map.flyTo(latest.coords, zoomForAccuracy(latest.accuracy))
     startLocating()
   }
+
+  // Rebuild the arrow only when it turns by a noticeable amount (5° steps), not on every GPS tick.
+  const driverHeadingStep = driver?.heading == null ? null : Math.round(driver.heading / 5) * 5
+  const driverIcon = useMemo(() => makeDriverIcon(driverHeadingStep), [driverHeadingStep])
 
   const myRideIds = new Set(myRides.map((ride) => ride.id))
   const nearbyRides = rides
