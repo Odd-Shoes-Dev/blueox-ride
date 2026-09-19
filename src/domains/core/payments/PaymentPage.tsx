@@ -238,7 +238,7 @@ export default function PaymentPage() {
   // If booking is already confirmed, redirect to ride details
   if (booking.status === 'confirmed') {
     return (
-      <div className="min-h-screen bg-background pb-8">
+      <div className="min-h-screen bg-background pb-24">
         <div className="bg-green-600 pt-12 pb-20 px-4">
           <PageContainer className="text-center">
             <CheckCircle className="w-16 h-16 text-white mx-auto mb-4" />
@@ -268,7 +268,7 @@ export default function PaymentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-8">
+    <div className="min-h-screen bg-background pb-24">
       {/* Header */}
       <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
         <PageContainer>

@@ -65,7 +65,7 @@ export default function RegisterPage() {
   return (
     <>
       <RegisterPageSEO />
-      <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-b from-navy-50 to-white dark:bg-none dark:bg-background">
+      <div className="min-h-screen flex items-center justify-center px-4 pt-12 pb-24 bg-gradient-to-b from-navy-50 to-white dark:bg-none dark:bg-background">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <img

@@ -7,6 +7,7 @@ import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
 import { Card, CardContent } from '@/shared/ui/card'
 import { LocationPicker } from '@/domains/core/rides/components/LocationPicker'
+import { useMapPins, useOptionalMapShell } from '@/domains/core/rides/map/MapShellContext'
 import { CarPhotoUpload } from '@/domains/core/rides/components/CarPhotoUpload'
 import { useToast } from '@/shared/hooks/use-toast'
 import { PageContainer } from '@/shared/components/PageContainer'
@@ -24,9 +25,11 @@ export default function CreateRidePage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const shell = useOptionalMapShell()
 
   const [origin, setOrigin] = useState<Location | null>(null)
   const [destination, setDestination] = useState<Location | null>(null)
+  useMapPins(origin, destination) // show the route's ends on the shared map
   const [departureDate, setDepartureDate] = useState('')
   const [departureTime, setDepartureTime] = useState('')
   const [price, setPrice] = useState('')
@@ -153,6 +156,7 @@ export default function CreateRidePage() {
         description: 'Your ride has been published.',
         variant: 'success',
       })
+      shell?.refreshMyRides() // so the new ride appears on the home map
       navigate(`/rides/${ride.id}`)
     } catch (error) {
       console.error('Create ride error:', error)
@@ -175,7 +179,7 @@ export default function CreateRidePage() {
   const minTime = departureDate === minDate ? now.toTimeString().slice(0, 5) : '00:00'
 
   return (
-    <div className="min-h-screen bg-background pb-8">
+    <div className="min-h-full bg-background pb-8">
       {/* Header */}
       <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
         <PageContainer>

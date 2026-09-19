@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ridesRepository,
   bookingsRepository,
@@ -16,11 +16,12 @@ import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/dialog'
+import { useOptionalMapShell, type PreviewableRide } from '@/domains/core/rides/map/MapShellContext'
 import { useToast } from '@/shared/hooks/use-toast'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { ReviewDialog } from '@/domains/core/rides/components/ReviewDialog'
 import { formatCurrency, formatDate } from '@/shared/lib/utils'
-import { Calendar, Users, Plus, X, Phone, MessageCircle, Wallet, Star, CheckCircle } from 'lucide-react'
+import { Calendar, Users, Plus, X, Phone, MessageCircle, Wallet, Star, CheckCircle, ArrowRight } from 'lucide-react'
 import type { RideRequest } from '@/shared/types'
 
 type RideWithBookings = ridesRepository.RideWithBookings
@@ -30,6 +31,16 @@ export default function MyRidesPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const shell = useOptionalMapShell()
+
+  // Tapping a card (but not the buttons/links inside it) shows that ride's route on
+  // the map behind the panel; tapping it again hides it.
+  const previewOnMap = (ride: PreviewableRide) => (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button, a, input, [role="button"]')) return
+    shell?.previewRide(shell.previewedRideId === ride.id ? null : ride)
+  }
+  const previewClass = (rideId: string) =>
+    `cursor-pointer transition-shadow ${shell?.previewedRideId === rideId ? 'ring-2 ring-primary' : 'hover:shadow-md'}`
 
   const [activeTab, setActiveTab] = useState('bookings')
   const [myRides, setMyRides] = useState<RideWithBookings[]>([])
@@ -148,6 +159,7 @@ export default function MyRidesPage() {
           : 'Your ride has been cancelled.',
         variant: 'success',
       })
+      shell?.refreshMyRides()
       fetchData()
     }
 
@@ -241,6 +253,7 @@ export default function MyRidesPage() {
         description: 'You and your passengers can now leave reviews.',
         variant: 'success',
       })
+      shell?.refreshMyRides()
       fetchData()
     }
 
@@ -285,7 +298,7 @@ export default function MyRidesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-[50dvh] flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     )
@@ -293,7 +306,7 @@ export default function MyRidesPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background pb-24">
+      <div className="min-h-full bg-background pb-8">
         <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
           <PageContainer>
             <h1 className="text-xl font-semibold text-header-foreground">My Rides</h1>
@@ -314,7 +327,7 @@ export default function MyRidesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-full bg-background pb-8">
       {/* Header */}
       <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
         <PageContainer>
@@ -347,9 +360,9 @@ export default function MyRidesPage() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                 {myBookings.map((booking) => (
-                  <Card key={booking.id}>
+                  <Card key={booking.id} className={previewClass(booking.ride.id)} onClick={previewOnMap(booking.ride)}>
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start mb-3">
                         <div>
@@ -375,6 +388,12 @@ export default function MyRidesPage() {
                           {booking.seats_booked} seat(s)
                         </span>
                       </div>
+                      <Button asChild variant="outline" size="sm" className="w-full mt-3">
+                        <Link to={`/rides/${booking.ride.id}`}>
+                          Open details
+                          <ArrowRight className="w-4 h-4 ml-1.5" />
+                        </Link>
+                      </Button>
 
                       {(booking.ride.car_brand || booking.ride.car_model) && (
                         <div className="text-xs text-muted-foreground mb-3">
@@ -486,7 +505,7 @@ export default function MyRidesPage() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                 {myRequests.map((request) => (
                   <Card key={request.id}>
                     <CardContent className="p-4">
@@ -566,9 +585,9 @@ export default function MyRidesPage() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                 {myRides.map((ride) => (
-                  <Card key={ride.id}>
+                  <Card key={ride.id} className={previewClass(ride.id)} onClick={previewOnMap(ride)}>
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start mb-3">
                         <div>
@@ -597,6 +616,12 @@ export default function MyRidesPage() {
                           {ride.total_seats - ride.available_seats}/{ride.total_seats} booked
                         </span>
                       </div>
+                      <Button asChild variant="outline" size="sm" className="w-full mt-3">
+                        <Link to={`/rides/${ride.id}`}>
+                          Open details
+                          <ArrowRight className="w-4 h-4 ml-1.5" />
+                        </Link>
+                      </Button>
 
                       {/* Passengers */}
                       {ride.bookings.filter(b => b.status === 'confirmed').length > 0 && (

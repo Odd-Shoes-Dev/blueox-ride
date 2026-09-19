@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/shared/ui/card'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
 import { LocationPicker } from '@/domains/core/rides/components/LocationPicker'
+import { useMapPins } from '@/domains/core/rides/map/MapShellContext'
 import { RidesMapView } from '@/domains/core/rides/components/RidesMapView'
 import { SearchPageSEO } from '@/shared/components/SEO'
 import { PageContainer } from '@/shared/components/PageContainer'
@@ -24,6 +25,7 @@ export default function SearchPage() {
   const navigate = useNavigate()
   const [origin, setOrigin] = useState<Location | null>(null)
   const [destination, setDestination] = useState<Location | null>(null)
+  useMapPins(origin, destination) // show the route's ends on the shared map
   const [date, setDate] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const [minSeats, setMinSeats] = useState('1')
@@ -88,7 +90,7 @@ export default function SearchPage() {
   return (
     <>
       <SearchPageSEO />
-      <div className="min-h-screen bg-background pb-24">
+      <div className="min-h-full bg-background pb-8">
         {/* Header */}
         <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
           <PageContainer>
@@ -185,7 +187,7 @@ export default function SearchPage() {
       <div className="px-4 mt-4">
         <PageContainer size="wide">
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               {[1, 2, 3].map((i) => (
                 <Card key={i}>
                   <CardContent className="p-4">
@@ -230,7 +232,7 @@ export default function SearchPage() {
                   View on Map
                 </Button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 {rides.map((ride) => (
                   <RideCard key={ride.id} ride={ride} userOrigin={origin} userDestination={destination} />
                 ))}

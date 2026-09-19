@@ -98,7 +98,7 @@ export default function RideRequestsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-full bg-background pb-8">
       {/* Header */}
       <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
         <PageContainer>
@@ -119,7 +119,7 @@ export default function RideRequestsPage() {
       <div className="px-4 mt-6">
         <PageContainer size="wide">
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               {[1, 2, 3].map((i) => (
                 <Card key={i}>
                   <CardContent className="p-4">
@@ -143,7 +143,7 @@ export default function RideRequestsPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               {requests.map((request) => (
                 <Card key={request.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4 space-y-3">
