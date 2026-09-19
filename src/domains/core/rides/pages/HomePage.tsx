@@ -488,7 +488,11 @@ export default function HomePage({
       )}
 
       {/* Quick Actions */}
-      <div className={`px-4 ${user ? '-mt-4' : 'mt-4'}`}>
+      {/* Positive margin for signed-in users too: this used to be -mt-4 so the cards
+          overlapped the old gradient hero, but the hero is now a full-screen map
+          (positioned, so it paints over non-positioned siblings) and that overlap
+          hid the top of the cards behind it. */}
+      <div className={`px-4 ${user ? 'mt-6' : 'mt-4'}`}>
         <PageContainer>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Link to={user ? '/rides/create' : '/login'} state={!user ? { from: '/rides/create' } : undefined}>
