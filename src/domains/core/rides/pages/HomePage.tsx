@@ -172,6 +172,13 @@ export default function HomePage({
   }
 
   const handleHeroLocationFound = (coords: { lat: number; lng: number }) => {
+    // The map can report several times as the reading sharpens or the user
+    // presses its locate button. Once they've chosen their own pickup ("Change"),
+    // don't overwrite it.
+    if (manualPickupOverride) {
+      setLocatingUser(false)
+      return
+    }
     reverseGeocode(coords.lat, coords.lng)
       .then((name) => setSearchOrigin({ ...coords, name }))
       .catch(() => setSearchOrigin({ ...coords, name: 'Current location' }))
