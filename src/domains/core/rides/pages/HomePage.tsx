@@ -10,7 +10,7 @@ import { HomePageSEO } from '@/shared/components/SEO'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { formatCurrency, formatDate } from '@/shared/lib/utils'
 import { reverseGeocode } from '@/shared/services/geocoding'
-import { Search, Calendar, Users, Star, Plus, ArrowRight, RefreshCw, Shield, Wallet, UserCheck, MessageSquare, Loader2, MapPin } from 'lucide-react'
+import { Search, Calendar, Users, Star, Plus, ArrowRight, RefreshCw, Shield, Wallet, UserCheck, MessageSquare, Loader2, MapPin, ChevronDown } from 'lucide-react'
 import type { BrandColors } from '@/shared/types/branding'
 
 // Semi-transparent white surface for controls floating over the hero map. Text on it is
@@ -53,6 +53,13 @@ export default function HomePage({
   const [searching, setSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const hasFetched = useRef(false)
+  const heroRef = useRef<HTMLDivElement>(null)
+
+  const scrollPastHero = () => {
+    const hero = heroRef.current
+    if (!hero) return
+    window.scrollTo({ top: hero.offsetTop + hero.offsetHeight, behavior: 'smooth' })
+  }
 
   // Memoize dynamic styles based on brand colors
   const brandStyles = useMemo(() => {
@@ -179,7 +186,13 @@ export default function HomePage({
             floating controls (fixed dark text, so they stay readable over
             any map colour in either theme). No headline here by design —
             just map + search. */}
-      <div className="relative h-[75vh] min-h-[520px] max-h-[760px] overflow-hidden">
+      {/* Full viewport height (dvh so mobile browser chrome doesn't push the
+          bottom edge off-screen). Signed-in users have the fixed bottom nav
+          (h-16), so subtract it to keep the map's bottom edge and attribution visible. */}
+      <div
+        ref={heroRef}
+        className={`relative overflow-hidden ${user ? 'h-[calc(100dvh-4rem)]' : 'h-[100dvh]'} min-h-[520px]`}
+      >
         <HeroLiveMap
           rides={rides}
           className="absolute inset-0"
@@ -189,27 +202,38 @@ export default function HomePage({
 
         {/* Top row: logo pill (left) + sign-in/avatar pill (right) */}
         <div className="absolute top-4 inset-x-4 z-20 flex items-center justify-between pointer-events-none">
-          <div className={`flex items-center gap-2 rounded-full pl-2 pr-4 py-2 ${GLASS}`}>
+          <Link
+            to="/"
+            aria-label="Blue OX Rides home"
+            className={`flex items-center gap-2 rounded-full pl-2 pr-4 py-2 hover:bg-white/90 transition-colors ${GLASS}`}
+          >
             <img
               src="/assets/logo1.png"
-              alt="Blue OX Rides"
+              alt=""
               className="w-7 h-7 object-contain"
             />
             <span className="font-bold text-navy-900 text-sm">Blue OX Rides</span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/search" aria-label="Search rides">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-navy-900 hover:bg-white/90 transition-colors ${GLASS}`}>
+                <Search className="w-5 h-5" />
+              </div>
+            </Link>
+            {user ? (
+              <Link to="/profile">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-navy-900 font-semibold ${GLASS}`}>
+                  {profile?.full_name?.[0]?.toUpperCase() || '?'}
+                </div>
+              </Link>
+            ) : (
+              <Link to="/login">
+                <div className={`px-4 py-2.5 rounded-full text-navy-900 text-sm font-medium hover:bg-white/80 transition-colors ${GLASS}`}>
+                  Sign In
+                </div>
+              </Link>
+            )}
           </div>
-          {user ? (
-            <Link to="/profile">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-navy-900 font-semibold ${GLASS}`}>
-                {profile?.full_name?.[0]?.toUpperCase() || '?'}
-              </div>
-            </Link>
-          ) : (
-            <Link to="/login">
-              <div className={`px-4 py-2.5 rounded-full text-navy-900 text-sm font-medium hover:bg-white/80 transition-colors ${GLASS}`}>
-                Sign In
-              </div>
-            </Link>
-          )}
         </div>
 
         {/* Church banner - its own floating pill, below the top row */}
@@ -317,6 +341,18 @@ export default function HomePage({
             </Card>
           </div>
         </div>
+
+        {/* Scroll-down FAB — the map fills the screen and captures drag/wheel
+            gestures, so the page itself can't be scrolled from here. Sits above
+            the map's attribution in the bottom-right corner. */}
+        <button
+          type="button"
+          onClick={scrollPastHero}
+          aria-label="Scroll to more"
+          className={`absolute bottom-8 right-4 z-20 w-12 h-12 rounded-full flex items-center justify-center text-navy-900 hover:bg-white/90 transition-colors ${GLASS}`}
+        >
+          <ChevronDown className="w-6 h-6" />
+        </button>
       </div>
 
       {/* Value Props - Only show to non-logged in users */}
