@@ -69,6 +69,11 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Page header bars — see --header in src/index.css
+        header: {
+          DEFAULT: "hsl(var(--header))",
+          foreground: "hsl(var(--header-foreground))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

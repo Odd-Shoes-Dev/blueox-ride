@@ -24,6 +24,35 @@
     --input: 210 20% 88%;
     --ring: 0 100% 63%;
     --radius: 0.75rem;
+    /* Page header bars (the coloured strip with the title and back button).
+       One place to restyle every header: change these two values per theme. */
+    --header: 216 55% 21%;
+    --header-foreground: 0 0% 100%;
+  }
+
+  /* Dark theme — opt-in only (the app defaults to light; see ThemeContext). */
+  .dark {
+    --background: 216 40% 11%;
+    --foreground: 210 25% 96%;
+    --card: 216 38% 15%;
+    --card-foreground: 210 25% 96%;
+    --popover: 216 38% 15%;
+    --popover-foreground: 210 25% 96%;
+    --primary: 0 100% 63%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 216 30% 20%;
+    --secondary-foreground: 210 25% 96%;
+    --muted: 216 30% 18%;
+    --muted-foreground: 210 15% 65%;
+    --accent: 216 30% 22%;
+    --accent-foreground: 210 25% 96%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 216 25% 24%;
+    --input: 216 25% 24%;
+    --ring: 0 100% 63%;
+    --header: 216 55% 21%;
+    --header-foreground: 0 0% 100%;
   }
 }
 
