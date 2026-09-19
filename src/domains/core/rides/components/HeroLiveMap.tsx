@@ -34,6 +34,8 @@ interface HeroLiveMapProps {
   } | null
   onSelectRide?: (rideId: string) => void
   onDeselectRide?: (rideId: string) => void
+  // Zoom the map to show all these points whenever `token` changes (e.g. search results)
+  fitPoints?: { points: [number, number][]; token: number } | null
   className?: string
   onLocationFound?: (coords: { lat: number; lng: number }) => void
   onLocationUnavailable?: () => void
@@ -89,6 +91,21 @@ const myRideIcon = L.divIcon({
   "><span style="transform: rotate(45deg); color: white; font-size: 13px; line-height: 1;">★</span></div>`,
   iconSize: [26, 26],
   iconAnchor: [13, 26],
+})
+
+// The two ends of a previewed ride's route. Small dots, so they don't get confused with the
+// searcher's own pickup/destination pins (which are shown at the same time).
+const rideStartIcon = L.divIcon({
+  className: 'hero-ride-end',
+  html: '<div style="width:14px;height:14px;border-radius:50%;background:white;border:3px solid #FF4040;box-shadow:0 1px 4px rgba(0,0,0,.35)"></div>',
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
+})
+const rideEndIcon = L.divIcon({
+  className: 'hero-ride-end',
+  html: '<div style="width:14px;height:14px;border-radius:50%;background:#FF4040;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,.35)"></div>',
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
 })
 
 const userIcon = L.divIcon({
@@ -275,14 +292,40 @@ function FitToPins({ points, suspended }: { points: [number, number][]; suspende
   return null
 }
 
+// Frames a set of points (search results plus the trip's ends) each time `token` changes.
+function FitToPoints({ points, token }: { points: [number, number][]; token: number | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (token === null || points.length === 0) return
+    if (points.length === 1) {
+      map.flyTo(points[0], Math.max(map.getZoom(), 14))
+      return
+    }
+    map.flyToBounds(L.latLngBounds(points), { padding: [50, 50], maxZoom: 15 })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, token])
+  return null
+}
+
 // Zooms to a previewed ride's whole route (only when the user tapped that ride's pin —
 // the driver's own route just draws, without moving the map away from where they are).
-function FitToRoute({ routeKey, points, active }: { routeKey: string | null; points: [number, number][]; active: boolean }) {
+function FitToRoute({
+  routeKey,
+  points,
+  extra,
+  active,
+}: {
+  routeKey: string | null
+  points: [number, number][]
+  // The searcher's own trip ends: kept in frame too, so previewing a ride doesn't lose them
+  extra: [number, number][]
+  active: boolean
+}) {
   const map = useMap()
   useEffect(() => {
     if (!active || points.length < 2) return
     const size = map.getSize()
-    map.flyToBounds(L.latLngBounds(points), {
+    map.flyToBounds(L.latLngBounds([...points, ...extra]), {
       paddingTopLeft: [40, Math.min(320, size.y * 0.45)],
       paddingBottomRight: [40, 110],
       maxZoom: 16,
@@ -363,6 +406,7 @@ export function HeroLiveMap({
   featured = null,
   onSelectRide,
   onDeselectRide,
+  fitPoints = null,
   className,
   onLocationFound,
   onLocationUnavailable,
@@ -580,6 +624,7 @@ export function HeroLiveMap({
         <ResizeSync />
         <FitToPins points={pinPoints} suspended={editing !== null} />
         <ResizeSync />
+        <FitToPoints points={fitPoints?.points ?? []} token={fitPoints?.token ?? null} />
         <FlyToFocus focus={focus} />
         <ViewReporter onChange={onViewChange} />
         <ZoomControl position="bottomleft" />
@@ -600,21 +645,21 @@ export function HeroLiveMap({
             <Polyline positions={featured.points} pathOptions={{ color: '#FF4040', weight: 5, opacity: 0.85 }} />
             <Marker
               position={[featured.origin.lat, featured.origin.lng]}
-              icon={pinIcon('pickup')}
+              icon={rideStartIcon}
               interactive={false}
               zIndexOffset={700}
             />
             <Marker
               position={[featured.destination.lat, featured.destination.lng]}
-              icon={pinIcon('dropoff')}
+              icon={rideEndIcon}
               interactive={false}
               zIndexOffset={900}
             />
           </>
         )}
-        <FitToRoute routeKey={featured?.rideId ?? null} points={featured?.points ?? []} active={!!featured?.fit} />
+        <FitToRoute routeKey={featured?.rideId ?? null} points={featured?.points ?? []} extra={pinPoints} active={!!featured?.fit} />
 
-        {!featured && routeStart && destinationPoint && editingKind === null && (
+        {routeStart && destinationPoint && editingKind === null && (
           <Polyline
             positions={[routeStart, destinationPoint]}
             pathOptions={{ color: PIN_COLORS.dropoff, weight: 3, opacity: 0.7, dashArray: '6 8' }}

@@ -53,6 +53,64 @@ export async function searchActiveRides(filters: RideSearchFilters = {}): Promis
   return data as RideWithDriverRow[]
 }
 
+export interface NearPoint {
+  lat: number
+  lng: number
+  radiusKm: number
+}
+
+// Degrees of latitude/longitude that span `km` around a point (good enough for a
+// bounding box; the caller refines with an exact distance).
+function boxDegrees(lat: number, km: number): { dLat: number; dLng: number } {
+  return { dLat: km / 110.54, dLng: km / (111.32 * Math.max(0.1, Math.cos((lat * Math.PI) / 180))) }
+}
+
+// Active upcoming rides that start near `origin` and/or end near `destination`.
+// Matches by location rather than by name, so differently-spelled places still find
+// each other. This narrows to a box around each point in the database; the exact
+// distance check and sorting happen in the app.
+export async function searchRidesNear(filters: {
+  origin?: NearPoint | null
+  destination?: NearPoint | null
+  date?: string // 'YYYY-MM-DD'
+  limit?: number
+}): Promise<RideWithDriverRow[]> {
+  let query = supabase
+    .from('rides_with_driver')
+    .select('*')
+    .eq('status', 'active')
+    .gt('departure_time', new Date().toISOString())
+    .order('departure_time', { ascending: true })
+
+  if (filters.origin) {
+    const { dLat, dLng } = boxDegrees(filters.origin.lat, filters.origin.radiusKm)
+    query = query
+      .gte('origin_lat', filters.origin.lat - dLat)
+      .lte('origin_lat', filters.origin.lat + dLat)
+      .gte('origin_lng', filters.origin.lng - dLng)
+      .lte('origin_lng', filters.origin.lng + dLng)
+  }
+  if (filters.destination) {
+    const { dLat, dLng } = boxDegrees(filters.destination.lat, filters.destination.radiusKm)
+    query = query
+      .gte('destination_lat', filters.destination.lat - dLat)
+      .lte('destination_lat', filters.destination.lat + dLat)
+      .gte('destination_lng', filters.destination.lng - dLng)
+      .lte('destination_lng', filters.destination.lng + dLng)
+  }
+  if (filters.date) {
+    const startOfDay = new Date(filters.date)
+    startOfDay.setHours(0, 0, 0, 0)
+    const endOfDay = new Date(filters.date)
+    endOfDay.setHours(23, 59, 59, 999)
+    query = query.gte('departure_time', startOfDay.toISOString()).lte('departure_time', endOfDay.toISOString())
+  }
+
+  const { data, error } = await query.limit(filters.limit ?? 200)
+  if (error) throw error
+  return data as RideWithDriverRow[]
+}
+
 // A driver's own upcoming rides (soonest first) — used to show "your ride" on the map.
 export async function getUpcomingRidesForDriver(driverId: string, limit = 5): Promise<RideWithDriverRow[]> {
   const { data, error } = await supabase

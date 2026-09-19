@@ -5,6 +5,8 @@ import { reverseGeocode } from '@/shared/services/geocoding'
 import { getRoute } from '@/shared/services/routing'
 import { useAuth } from '@/domains/core/auth/AuthContext'
 import { useLiveTrip } from '@/domains/core/rides/hooks/useLiveTrip'
+import { haversineKm } from '@/domains/core/rides/lib/routeProgress'
+import { DEFAULT_SEARCH_RADIUS_KM } from '@/domains/core/rides/map/searchConstants'
 import type { PinKind } from '@/domains/core/rides/components/mapPins'
 import type { PlacedPoint } from '@/domains/core/rides/components/PinPlacer'
 import {
@@ -12,6 +14,8 @@ import {
   type FeaturedRoute,
   type MapShellValue,
   type PreviewableRide,
+  type RideResult,
+  type SearchResults,
   type PanelPins,
   type PinRequest,
   type RideWithDriver,
@@ -82,6 +86,9 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
   // and that close must not wipe out B's selection.
   const deselectRide = useCallback((rideId: string) => setSelectedRideId((current) => (current === rideId ? null : current)), [])
 
+  // Search results (declared here because tapping a result pin looks the ride up in them)
+  const [results, setResults] = useState<SearchResults | null>(null)
+
   // A ride whose route the user asked to see (a card in My Rides, Ride Details).
   // It stays until cleared, so closing a panel doesn't make the route vanish.
   const [activePreview, setActivePreview] = useState<PreviewableRide | null>(null)
@@ -108,9 +115,12 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
 
   // Featured ride: the previewed/tapped one, otherwise the driver's own next ride.
   const featuredRide = useMemo<PreviewableRide | null>(() => {
-    const tapped = selectedRideId ? [...rides, ...myRides].find((ride) => ride.id === selectedRideId) : undefined
+    // A tapped pin can belong to the search results, which are not always in the general list.
+    const tapped = selectedRideId
+      ? [...(results?.rides ?? []), ...rides, ...myRides].find((ride) => ride.id === selectedRideId)
+      : undefined
     return activePreview ?? tapped ?? myRides[0] ?? null
-  }, [activePreview, selectedRideId, rides, myRides])
+  }, [activePreview, selectedRideId, results, rides, myRides])
 
   // Road routes are cached per ride so tapping the same pin again is instant.
   type RouteEntry = { points: [number, number][] | null; summary: { distanceKm: number; durationMin: number } | null }
@@ -171,6 +181,7 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
       destination: { lat: featuredRide.destination_lat, lng: featuredRide.destination_lng },
       summary: featuredEntry.summary,
       fit: activePreview?.id === featuredRide.id || selectedRideId === featuredRide.id,
+      isDefault: activePreview?.id !== featuredRide.id && selectedRideId !== featuredRide.id,
     }
   }, [featuredRide, featuredEntry, selectedRideId, activePreview])
 
@@ -203,21 +214,55 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
   // explicitly picked it themselves.
   const usingAutoPickup = !geoFailed && !manualPickupOverride
 
-  const searchRides = useCallback(async () => {
-    if (searching) return
-    setSearching(true)
-    try {
-      await loadRides(
-        {
-          originName: usingAutoPickup ? undefined : origin?.name,
-          destinationName: destination?.name,
-        },
-        50
-      )
-    } finally {
-      setSearching(false)
-    }
-  }, [searching, loadRides, usingAutoPickup, origin, destination])
+  const searchCount = useRef(0)
+
+  // "Find a Ride": rides that start near the pickup and end near the destination, matched
+  // by distance from the coordinates (names are often spelled differently), nearest first.
+  // The pickup counts even when it's just the user's own location.
+  const searchRides = useCallback(
+    async (options: { radiusKm?: number; date?: string } = {}) => {
+      const radiusKm = options.radiusKm ?? DEFAULT_SEARCH_RADIUS_KM
+      setSearching(true)
+      try {
+        const found = await withTimeout(
+          ridesRepository.searchRidesNear({
+            origin: origin ? { lat: origin.lat, lng: origin.lng, radiusKm } : null,
+            destination: destination ? { lat: destination.lat, lng: destination.lng, radiusKm } : null,
+            date: options.date,
+          }),
+          15000
+        )
+
+        const matched: RideResult[] = []
+        for (const ride of found) {
+          const originKm = origin ? haversineKm(origin, { lat: ride.origin_lat, lng: ride.origin_lng }) : null
+          const destinationKm = destination
+            ? haversineKm(destination, { lat: ride.destination_lat, lng: ride.destination_lng })
+            : null
+          // The box query is square; keep only what's really within the radius.
+          if ((originKm !== null && originKm > radiusKm) || (destinationKm !== null && destinationKm > radiusKm)) continue
+          matched.push({ ...ride, match: { originKm, destinationKm } })
+        }
+        // Closest overall first; ties (and searches with no place chosen) by departure time.
+        matched.sort(
+          (a, b) =>
+            (a.match.originKm ?? 0) + (a.match.destinationKm ?? 0) - ((b.match.originKm ?? 0) + (b.match.destinationKm ?? 0)) ||
+            a.departure_time.localeCompare(b.departure_time)
+        )
+
+        searchCount.current += 1
+        setResults({ rides: matched, origin, destination, radiusKm, date: options.date, token: searchCount.current })
+      } catch (err) {
+        console.error('Search error:', err)
+        searchCount.current += 1
+        setResults({ rides: [], origin, destination, radiusKm, date: options.date, token: searchCount.current })
+      } finally {
+        setSearching(false)
+      }
+    },
+    [origin, destination]
+  )
+  const clearResults = useCallback(() => setResults(null), [])
 
   const handleLocationFound = useCallback((coords: { lat: number; lng: number }) => {
     // The map can report several times as the reading sharpens or the user
@@ -279,6 +324,8 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
       ridesError,
       refreshRides,
       searchRides,
+      results,
+      clearResults,
       myRides,
       refreshMyRides,
       featured,
@@ -324,6 +371,8 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
       ridesError,
       refreshRides,
       searchRides,
+      results,
+      clearResults,
       myRides,
       refreshMyRides,
       featured,
