@@ -6,6 +6,7 @@ import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
 import { LocationPicker } from '@/domains/core/rides/components/LocationPicker'
 import { HeroLiveMap } from '@/domains/core/rides/components/HeroLiveMap'
+import type { PinKind } from '@/domains/core/rides/components/mapPins'
 import { HomePageSEO } from '@/shared/components/SEO'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { formatCurrency, formatDate } from '@/shared/lib/utils'
@@ -47,6 +48,8 @@ export default function HomePage({
   const [locatingUser, setLocatingUser] = useState(true)
   const [geoFailed, setGeoFailed] = useState(false)
   const [manualPickupOverride, setManualPickupOverride] = useState(false)
+  // Which pin the user is currently placing on the hero map (null = none).
+  const [editingPin, setEditingPin] = useState<PinKind | null>(null)
   const [rides, setRides] = useState<RideWithDriver[]>([])
   const [openRequestCount, setOpenRequestCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -173,6 +176,12 @@ export default function HomePage({
     setLocatingUser(false)
   }
 
+  const handlePinConfirm = (kind: PinKind, point: Location) => {
+    if (kind === 'pickup') setSearchOrigin(point)
+    else setSearchDestination(point)
+    setEditingPin(null)
+  }
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     searchRides()
@@ -198,6 +207,12 @@ export default function HomePage({
           className="absolute inset-0"
           onLocationFound={handleHeroLocationFound}
           onLocationUnavailable={handleHeroLocationUnavailable}
+          // In auto-pickup mode the start is the user's own dot, not a pin.
+          origin={usingAutoPickup ? null : searchOrigin}
+          destination={searchDestination}
+          editing={editingPin}
+          onEditConfirm={handlePinConfirm}
+          onEditCancel={() => setEditingPin(null)}
         />
 
         {/* Top row: logo pill (left) + sign-in/avatar pill (right) */}
@@ -260,8 +275,12 @@ export default function HomePage({
           </div>
         )}
 
-        {/* Search widget — floating opaque card directly on the map */}
-        <div className={`absolute inset-x-4 z-20 pointer-events-none ${churchName ? 'top-36' : 'top-20'}`}>
+        {/* Search widget — floating card directly on the map. Hidden (not
+            unmounted, so typed text survives) while a pin is being placed, so
+            the map is fully visible. */}
+        <div
+          className={`absolute inset-x-4 z-20 pointer-events-none ${churchName ? 'top-36' : 'top-20'} ${editingPin ? 'hidden' : ''}`}
+        >
           <div className="max-w-md mx-auto">
             <Card className={`shadow-xl text-navy-900 ${GLASS}`}>
               <CardContent className="p-4">
@@ -274,7 +293,7 @@ export default function HomePage({
                   <form onSubmit={handleSearch} className="space-y-2">
                     <div className="flex items-center justify-between text-xs text-navy-900/70 px-1">
                       <span className="flex items-center gap-1 truncate">
-                        <MapPin className="w-3 h-3 flex-shrink-0 text-coral-500" />
+                        <MapPin className="w-3 h-3 flex-shrink-0 text-green-600" />
                         <span className="truncate">From {searchOrigin.name}</span>
                       </span>
                       <button
@@ -291,6 +310,7 @@ export default function HomePage({
                       placeholder="Where are you going?"
                       markerColor="dropoff"
                       glass
+                      onPickOnMap={() => setEditingPin('dropoff')}
                     />
                     <Button type="submit" className="w-full" size="lg" disabled={searching || !searchDestination}>
                       {searching ? (
@@ -314,6 +334,7 @@ export default function HomePage({
                       placeholder="Leaving from..."
                       markerColor="pickup"
                       glass
+                      onPickOnMap={() => setEditingPin('pickup')}
                     />
                     <LocationPicker
                       value={searchDestination}
@@ -321,6 +342,7 @@ export default function HomePage({
                       placeholder="Going to..."
                       markerColor="dropoff"
                       glass
+                      onPickOnMap={() => setEditingPin('dropoff')}
                     />
                     <Button type="submit" className="w-full" size="lg" disabled={searching}>
                       {searching ? (
@@ -345,14 +367,16 @@ export default function HomePage({
         {/* Scroll-down FAB — the map fills the screen and captures drag/wheel
             gestures, so the page itself can't be scrolled from here. Sits above
             the map's attribution in the bottom-right corner. */}
-        <button
-          type="button"
-          onClick={scrollPastHero}
-          aria-label="Scroll to more"
-          className={`absolute bottom-8 right-4 z-20 w-12 h-12 rounded-full flex items-center justify-center text-navy-900 hover:bg-white/90 transition-colors ${GLASS}`}
-        >
-          <ChevronDown className="w-6 h-6" />
-        </button>
+        {!editingPin && (
+          <button
+            type="button"
+            onClick={scrollPastHero}
+            aria-label="Scroll to more"
+            className={`absolute bottom-8 right-4 z-20 w-12 h-12 rounded-full flex items-center justify-center text-navy-900 hover:bg-white/90 transition-colors ${GLASS}`}
+          >
+            <ChevronDown className="w-6 h-6" />
+          </button>
+        )}
       </div>
 
       {/* Value Props - Only show to non-logged in users */}

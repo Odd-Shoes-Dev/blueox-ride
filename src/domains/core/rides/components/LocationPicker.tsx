@@ -21,6 +21,10 @@ interface LocationPickerProps {
   // Fixed light look with dark text regardless of app theme, since the
   // backdrop behind it is the map, not the themed page background.
   glass?: boolean
+  // When provided, the "select on map" button hands off to the caller (which
+  // places the pin on its own map, e.g. the landing hero) instead of opening
+  // the full-screen picker modal.
+  onPickOnMap?: () => void
 }
 
 const glassInput = 'bg-white/80 border-white/60 text-navy-900 placeholder:text-navy-900/60'
@@ -35,6 +39,7 @@ export function LocationPicker({
   markerColor = 'pickup',
   className,
   glass = false,
+  onPickOnMap,
 }: LocationPickerProps) {
   const [input, setInput] = useState(value?.name || '')
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([])
@@ -159,7 +164,8 @@ export function LocationPicker({
     setSuggestions([])
   }
 
-  const iconColor = markerColor === 'pickup' ? 'text-coral-500' : 'text-navy-900'
+  // Matches the pin colours on the map (green pickup, navy destination).
+  const iconColor = markerColor === 'pickup' ? 'text-green-600' : 'text-navy-900'
 
   return (
     <>
@@ -194,7 +200,7 @@ export function LocationPicker({
             className={cn(
               'flex-shrink-0 w-10 h-10 rounded-md border flex items-center justify-center',
               'bg-background hover:bg-muted transition-colors',
-              markerColor === 'pickup' ? 'border-coral-200 text-coral-500' : 'border-navy-200 text-navy-900',
+              markerColor === 'pickup' ? 'border-green-200 text-green-600' : 'border-navy-200 text-navy-900',
               glass && glassButton
             )}
             title="Use my current location"
@@ -207,11 +213,11 @@ export function LocationPicker({
           </button>
           <button
             type="button"
-            onClick={() => setShowMapPicker(true)}
+            onClick={() => (onPickOnMap ? onPickOnMap() : setShowMapPicker(true))}
             className={cn(
               'flex-shrink-0 w-10 h-10 rounded-md border flex items-center justify-center',
               'bg-background hover:bg-muted transition-colors',
-              markerColor === 'pickup' ? 'border-coral-200 text-coral-500' : 'border-navy-200 text-navy-900',
+              markerColor === 'pickup' ? 'border-green-200 text-green-600' : 'border-navy-200 text-navy-900',
               glass && glassButton
             )}
             title="Select on map"
