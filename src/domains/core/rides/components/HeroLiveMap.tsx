@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MapContainer, TileLayer, Marker, Popup, Polyline, ZoomControl, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, ZoomControl, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import { Locate, LocateFixed, Loader2 } from 'lucide-react'
 import { formatCurrency } from '@/shared/lib/utils'
@@ -84,16 +84,29 @@ const userIcon = L.divIcon({
 })
 
 const DEFAULT_ZOOM = 12 // city-wide view, used until we know exactly where the visitor is
-const LOCATED_ZOOM = 18 // close street-level, like Google Maps opens to once it has your position
 
-// react-leaflet's `center`/`zoom` props on MapContainer only set the
-// *initial* view — changing them later doesn't move an already-mounted map.
-// This re-centers/re-zooms it once geolocation resolves.
-function RecenterAndZoom({ center, zoom }: { center: [number, number]; zoom: number }) {
-  const map = useMap()
-  useEffect(() => {
-    map.setView(center, zoom)
-  }, [map, center, zoom])
+// Location quality. The first reading a device gives is often a rough guess
+// (Wi-Fi / mobile tower / IP) that GPS then sharpens over the next seconds, so
+// we keep listening briefly and only trust a reading as "the pickup" once it
+// is accurate enough — or after a short deadline, whichever comes first.
+const GOOD_ACCURACY_M = 100 // accurate enough to zoom to street level and use as the pickup
+const DONE_ACCURACY_M = 25 // no point refining further
+const REPORT_DEADLINE_MS = 6000 // report the best reading so far if it never gets "good"
+const WATCH_MAX_MS = 20000 // stop listening (saves battery) after this long
+const MIN_CIRCLE_M = 20 // below this the pulsing dot already says it all
+
+// How far to zoom for a reading of the given accuracy (metres) — a 2 km-wide
+// guess shouldn't be shown at street level.
+function zoomForAccuracy(accuracy: number): number {
+  if (accuracy <= GOOD_ACCURACY_M) return 18
+  if (accuracy <= 500) return 16
+  if (accuracy <= 2000) return 14
+  return 12
+}
+
+// Stops "keep the map on my dot" once the user drags the map themselves.
+function FollowBreaker({ onDrag }: { onDrag: () => void }) {
+  useMapEvents({ dragstart: onDrag })
   return null
 }
 
@@ -192,53 +205,138 @@ export function HeroLiveMap({
   onEditCancel,
 }: HeroLiveMapProps) {
   const navigate = useNavigate()
-  const [center, setCenter] = useState<[number, number]>(DEFAULT_MAP_CENTER)
-  const [zoom, setZoom] = useState(DEFAULT_ZOOM)
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null)
-  const [locating, setLocating] = useState(false)
+  const [accuracy, setAccuracy] = useState<number | null>(null) // metres; drawn as a circle round the dot
+  const [locating, setLocating] = useState(false) // true only while waiting for the first reading
   const [isCentered, setIsCentered] = useState(false)
   // State (not a ref) so PinPlacer can render once the map instance exists.
   const [map, setMap] = useState<L.Map | null>(null)
 
-  const requestLocation = useCallback(() => {
+  // Refs, because these are read from long-lived geolocation callbacks.
+  const mapRef = useRef<L.Map | null>(null)
+  const watchIdRef = useRef<number | null>(null)
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const followRef = useRef(true) // keep the map on the dot until the user drags it away
+  const hasFixRef = useRef(false)
+  const reportedRef = useRef({ any: false, accurate: false })
+  const latestFixRef = useRef<{ coords: [number, number]; accuracy: number } | null>(null)
+  const fallbackTriedRef = useRef(false)
+
+  useEffect(() => {
+    mapRef.current = map
+  }, [map])
+
+  const stopLocating = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current = null
+    }
+    timersRef.current.forEach(clearTimeout)
+    timersRef.current = []
+  }, [])
+
+  // Handles every reading: moves the dot, draws the accuracy, keeps the map on
+  // it while following, and tells the parent when the reading is trustworthy.
+  const applyFix = useCallback(
+    (position: GeolocationPosition) => {
+      const coords: [number, number] = [position.coords.latitude, position.coords.longitude]
+      const acc = position.coords.accuracy
+      const isFirst = !hasFixRef.current
+      hasFixRef.current = true
+      latestFixRef.current = { coords, accuracy: acc }
+
+      setUserLocation(coords)
+      setAccuracy(acc)
+      setLocating(false)
+
+      const m = mapRef.current
+      if (m && followRef.current) {
+        const targetZoom = zoomForAccuracy(acc)
+        // First reading sets the view; later, sharper readings only ever zoom in.
+        m.setView(coords, isFirst ? targetZoom : Math.max(m.getZoom(), targetZoom))
+      }
+
+      const report = () => onLocationFound?.({ lat: coords[0], lng: coords[1] })
+      if (acc <= GOOD_ACCURACY_M && !reportedRef.current.accurate) {
+        reportedRef.current = { any: true, accurate: true }
+        report()
+      }
+
+      if (acc <= DONE_ACCURACY_M) stopLocating()
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stopLocating]
+  )
+
+  // Starts (or restarts) a fresh, high-accuracy reading — never a cached one.
+  const startLocating = useCallback(() => {
     if (!navigator.geolocation) {
       onLocationUnavailable?.()
       return
     }
 
+    stopLocating()
+    hasFixRef.current = false
+    reportedRef.current = { any: false, accurate: false }
+    fallbackTriedRef.current = false
     setLocating(true)
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords: [number, number] = [position.coords.latitude, position.coords.longitude]
-        setUserLocation(coords)
-        setCenter(coords)
-        setZoom(LOCATED_ZOOM)
-        setLocating(false)
-        onLocationFound?.({ lat: position.coords.latitude, lng: position.coords.longitude })
-      },
-      () => {
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      applyFix,
+      (error) => {
+        if (hasFixRef.current && error.code !== error.PERMISSION_DENIED) return // keep the reading we have
+
+        // No reading at all: some browsers/devices can't deliver high-accuracy
+        // fixes, so try once more in low-accuracy mode before giving up.
+        if (!fallbackTriedRef.current && error.code !== error.PERMISSION_DENIED) {
+          fallbackTriedRef.current = true
+          stopLocating()
+          navigator.geolocation.getCurrentPosition(
+            applyFix,
+            () => {
+              setLocating(false)
+              onLocationUnavailable?.()
+            },
+            { enableHighAccuracy: false, timeout: 8000, maximumAge: 60 * 1000 }
+          )
+          return
+        }
+
         // Silent fallback to the default city view — this is decorative
         // backdrop, not a required permission for using the app.
+        stopLocating()
         setLocating(false)
         onLocationUnavailable?.()
       },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    )
+
+    // If the reading never gets "good", still hand the parent the best one so far.
+    timersRef.current.push(
+      setTimeout(() => {
+        const latest = latestFixRef.current
+        if (latest && !reportedRef.current.any) {
+          reportedRef.current = { any: true, accurate: latest.accuracy <= GOOD_ACCURACY_M }
+          onLocationFound?.({ lat: latest.coords[0], lng: latest.coords[1] })
+        }
+      }, REPORT_DEADLINE_MS),
+      setTimeout(stopLocating, WATCH_MAX_MS)
     )
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [applyFix, stopLocating])
 
   useEffect(() => {
-    requestLocation()
-  }, [requestLocation])
+    startLocating()
+    return stopLocating
+  }, [startLocating, stopLocating])
 
-  // Google-Maps-style "my location" button: fly back to the user's dot if we
-  // know where it is, otherwise try to get their location again.
+  // Google-Maps-style "my location" button. Glide to the last known spot right
+  // away, then take a fresh high-accuracy reading and follow it as it sharpens.
   const handleLocateClick = () => {
-    if (userLocation && map) {
-      map.flyTo(userLocation, LOCATED_ZOOM)
-    } else {
-      requestLocation()
-    }
+    followRef.current = true
+    const latest = latestFixRef.current
+    if (latest && map) map.flyTo(latest.coords, zoomForAccuracy(latest.accuracy))
+    startLocating()
   }
 
   const nearbyRides = rides.filter((ride) => ride.origin_lat && ride.origin_lng).slice(0, 12)
@@ -269,12 +367,12 @@ export function HeroLiveMap({
     <div className={className} style={{ zIndex: 0 }}>
       <MapContainer
         ref={setMap}
-        center={center}
-        zoom={zoom}
+        center={DEFAULT_MAP_CENTER}
+        zoom={DEFAULT_ZOOM}
         zoomControl={false}
         style={{ height: '100%', width: '100%' }}
       >
-        <RecenterAndZoom center={center} zoom={zoom} />
+        <FollowBreaker onDrag={() => { followRef.current = false }} />
         <CenterWatcher target={userLocation} onChange={setIsCentered} />
         <FitToPins points={pinPoints} suspended={editing !== null} />
         <FlyToFocus focus={focus} />
@@ -282,6 +380,14 @@ export function HeroLiveMap({
         <ZoomControl position="bottomleft" />
         <TileLayer attribution={MAP_TILE_ATTRIBUTION} url={MAP_TILE_URL} />
 
+        {/* How sure we are: the wider the circle, the rougher the reading. */}
+        {userLocation && accuracy !== null && accuracy > MIN_CIRCLE_M && (
+          <Circle
+            center={userLocation}
+            radius={accuracy}
+            pathOptions={{ color: '#3B82F6', weight: 1, opacity: 0.5, fillColor: '#3B82F6', fillOpacity: 0.1, interactive: false }}
+          />
+        )}
         {userLocation && <Marker position={userLocation} icon={userIcon} />}
 
         {routeStart && destinationPoint && editing === null && (

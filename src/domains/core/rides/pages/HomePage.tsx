@@ -172,6 +172,13 @@ export default function HomePage({
   }
 
   const handleHeroLocationFound = (coords: { lat: number; lng: number }) => {
+    // The map can report several times as the reading sharpens or the user
+    // presses its locate button. Once they've chosen their own pickup ("Change"),
+    // don't overwrite it.
+    if (manualPickupOverride) {
+      setLocatingUser(false)
+      return
+    }
     reverseGeocode(coords.lat, coords.lng)
       .then((name) => setSearchOrigin({ ...coords, name }))
       .catch(() => setSearchOrigin({ ...coords, name: 'Current location' }))
@@ -208,11 +215,11 @@ export default function HomePage({
             any map colour in either theme). No headline here by design —
             just map + search. */}
       {/* Full viewport height (dvh so mobile browser chrome doesn't push the
-          bottom edge off-screen). Signed-in users have the fixed bottom nav
-          (h-16), so subtract it to keep the map's bottom edge and attribution visible. */}
+          bottom edge off-screen). Everyone has the fixed bottom nav (h-16), so
+          subtract it to keep the map's bottom edge and attribution visible. */}
       <div
         ref={heroRef}
-        className={`relative overflow-hidden ${user ? 'h-[calc(100dvh-4rem)]' : 'h-[100dvh]'} min-h-[520px]`}
+        className="relative overflow-hidden h-[calc(100dvh-4rem)] min-h-[520px]"
       >
         <HeroLiveMap
           rides={rides}

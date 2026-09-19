@@ -1,26 +1,20 @@
 import { Link, useLocation } from 'react-router-dom'
-import { PlusCircle, Calendar, User } from 'lucide-react'
+import { PlusCircle, Calendar } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { useAuth } from '@/domains/core/auth/AuthContext'
 
-// Nav items for logged-in users. Home/Search/Sign In live in the hero's top
-// corners instead (logo → home, search button, sign-in button).
-const authNavItems = [
+// Same two tabs for everyone. Home, Profile and Sign In live in the top corners
+// of every page instead (logo → home, avatar → profile, Sign In pill).
+// Both destinations need an account, so for guests a tap goes to Login and
+// returns them here afterwards (same behaviour as the landing page's cards).
+const navItems = [
   { path: '/rides/create', icon: PlusCircle, label: 'Offer' },
   { path: '/my-rides', icon: Calendar, label: 'My Rides' },
-  { path: '/profile', icon: User, label: 'Profile' },
 ]
-
-// Nav items for guests — none; every guest action is in the hero corners
-const guestNavItems: typeof authNavItems = []
 
 export function BottomNav() {
   const location = useLocation()
   const { user } = useAuth()
-
-  const navItems = user ? authNavItems : guestNavItems
-
-  if (navItems.length === 0) return null
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-background border-t safe-bottom z-50">
@@ -30,7 +24,8 @@ export function BottomNav() {
           return (
             <Link
               key={path}
-              to={path}
+              to={user ? path : '/login'}
+              state={user ? undefined : { from: path }}
               className={cn(
                 'flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-colors',
                 isActive
