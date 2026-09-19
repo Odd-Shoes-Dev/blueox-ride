@@ -13,6 +13,13 @@ import { reverseGeocode } from '@/shared/services/geocoding'
 import { Search, Calendar, Users, Star, Plus, ArrowRight, RefreshCw, Shield, Wallet, UserCheck, MessageSquare, Loader2, MapPin } from 'lucide-react'
 import type { BrandColors } from '@/shared/types/branding'
 
+// Semi-transparent white surface for controls floating over the hero map. Text on it is
+// always navy (not theme-dependent) since what's behind it is the map, not the page.
+// `pointer-events-auto` because the full-width positioning wrappers around these are
+// `pointer-events-none` — otherwise the empty space beside each control would swallow
+// taps/drags meant for the map underneath.
+const GLASS = 'bg-white/80 border border-white/50 shadow-lg pointer-events-auto'
+
 interface Location {
   lat: number
   lng: number
@@ -168,10 +175,10 @@ export default function HomePage({
     <>
       <HomePageSEO />
       <div className="min-h-screen bg-background pb-24">
-        {/* Hero Section — full-bleed live map, Google-Maps-style floating
-            controls (small opaque pills, never text/cards translucent over
-            the map itself, so nothing ever blends in regardless of theme
-            or what's under it). No headline here by design — just map + search. */}
+        {/* Hero Section — full-bleed live map with semi-transparent white
+            floating controls (fixed dark text, so they stay readable over
+            any map colour in either theme). No headline here by design —
+            just map + search. */}
       <div className="relative h-[75vh] min-h-[520px] max-h-[760px] overflow-hidden">
         <HeroLiveMap
           rides={rides}
@@ -181,8 +188,8 @@ export default function HomePage({
         />
 
         {/* Top row: logo pill (left) + sign-in/avatar pill (right) */}
-        <div className="absolute top-4 inset-x-4 z-20 flex items-center justify-between">
-          <div className="flex items-center gap-2 bg-white rounded-full pl-2 pr-4 py-2 shadow-lg">
+        <div className="absolute top-4 inset-x-4 z-20 flex items-center justify-between pointer-events-none">
+          <div className={`flex items-center gap-2 rounded-full pl-2 pr-4 py-2 ${GLASS}`}>
             <img
               src="/assets/logo1.png"
               alt="Blue OX Rides"
@@ -192,13 +199,13 @@ export default function HomePage({
           </div>
           {user ? (
             <Link to="/profile">
-              <div className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center text-navy-900 font-semibold">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-navy-900 font-semibold ${GLASS}`}>
                 {profile?.full_name?.[0]?.toUpperCase() || '?'}
               </div>
             </Link>
           ) : (
             <Link to="/login">
-              <div className="px-4 py-2.5 rounded-full bg-white shadow-lg text-navy-900 text-sm font-medium hover:bg-muted transition-colors">
+              <div className={`px-4 py-2.5 rounded-full text-navy-900 text-sm font-medium hover:bg-white/80 transition-colors ${GLASS}`}>
                 Sign In
               </div>
             </Link>
@@ -207,8 +214,8 @@ export default function HomePage({
 
         {/* Church banner - its own floating pill, below the top row */}
         {churchName && (
-          <div className="absolute top-20 inset-x-4 z-10 flex justify-center">
-            <div className="inline-flex items-center gap-3 bg-white rounded-xl px-4 py-2 shadow-lg">
+          <div className="absolute top-20 inset-x-4 z-10 flex justify-center pointer-events-none">
+            <div className={`inline-flex items-center gap-3 rounded-xl px-4 py-2 text-navy-900 ${GLASS}`}>
               {churchLogoUrl ? (
                 <img
                   src={churchLogoUrl}
@@ -223,25 +230,25 @@ export default function HomePage({
                   {churchName}
                 </div>
               )}
-              <div className="h-5 w-px bg-border" />
-              <span className="text-xs text-muted-foreground">Official Partner</span>
+              <div className="h-5 w-px bg-navy-900/20" />
+              <span className="text-xs text-navy-900/70">Official Partner</span>
             </div>
           </div>
         )}
 
         {/* Search widget — floating opaque card directly on the map */}
-        <div className={`absolute inset-x-4 z-20 ${churchName ? 'top-36' : 'top-20'}`}>
+        <div className={`absolute inset-x-4 z-20 pointer-events-none ${churchName ? 'top-36' : 'top-20'}`}>
           <div className="max-w-md mx-auto">
-            <Card className="shadow-xl bg-white border-0">
+            <Card className={`shadow-xl text-navy-900 ${GLASS}`}>
               <CardContent className="p-4">
                 {locatingUser ? (
-                  <div className="flex items-center gap-2 text-muted-foreground py-2 text-sm">
+                  <div className="flex items-center gap-2 text-navy-900/70 py-2 text-sm">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Finding your location...
                   </div>
                 ) : usingAutoPickup && searchOrigin ? (
                   <form onSubmit={handleSearch} className="space-y-2">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+                    <div className="flex items-center justify-between text-xs text-navy-900/70 px-1">
                       <span className="flex items-center gap-1 truncate">
                         <MapPin className="w-3 h-3 flex-shrink-0 text-coral-500" />
                         <span className="truncate">From {searchOrigin.name}</span>
@@ -249,7 +256,7 @@ export default function HomePage({
                       <button
                         type="button"
                         onClick={() => setManualPickupOverride(true)}
-                        className="text-primary underline flex-shrink-0 ml-2"
+                        className="text-navy-900 font-medium underline flex-shrink-0 ml-2"
                       >
                         Change
                       </button>
@@ -259,6 +266,7 @@ export default function HomePage({
                       onChange={setSearchDestination}
                       placeholder="Where are you going?"
                       markerColor="dropoff"
+                      glass
                     />
                     <Button type="submit" className="w-full" size="lg" disabled={searching || !searchDestination}>
                       {searching ? (
@@ -281,12 +289,14 @@ export default function HomePage({
                       onChange={setSearchOrigin}
                       placeholder="Leaving from..."
                       markerColor="pickup"
+                      glass
                     />
                     <LocationPicker
                       value={searchDestination}
                       onChange={setSearchDestination}
                       placeholder="Going to..."
                       markerColor="dropoff"
+                      glass
                     />
                     <Button type="submit" className="w-full" size="lg" disabled={searching}>
                       {searching ? (

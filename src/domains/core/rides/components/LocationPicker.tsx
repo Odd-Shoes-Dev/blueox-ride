@@ -17,7 +17,16 @@ interface LocationPickerProps {
   placeholder?: string
   markerColor?: 'pickup' | 'dropoff'
   className?: string
+  // Semi-transparent white styling for use on top of a map/image (e.g. the landing hero).
+  // Fixed light look with dark text regardless of app theme, since the
+  // backdrop behind it is the map, not the themed page background.
+  glass?: boolean
 }
+
+const glassInput = 'bg-white/80 border-white/60 text-navy-900 placeholder:text-navy-900/60'
+const glassButton = 'bg-white/80 hover:bg-white/90 border-white/60'
+// Suggestions are a list of text that has to stay readable over the map, so keep this one denser.
+const glassDropdown = 'bg-white/85 border-white/60'
 
 export function LocationPicker({
   value,
@@ -25,6 +34,7 @@ export function LocationPicker({
   placeholder = 'Search location',
   markerColor = 'pickup',
   className,
+  glass = false,
 }: LocationPickerProps) {
   const [input, setInput] = useState(value?.name || '')
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([])
@@ -162,7 +172,7 @@ export function LocationPicker({
               onChange={handleInputChange}
               onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
               placeholder={placeholder}
-              className="pl-10 pr-10"
+              className={cn('pl-10 pr-10', glass && glassInput)}
             />
             {loading && (
               <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
@@ -184,7 +194,8 @@ export function LocationPicker({
             className={cn(
               'flex-shrink-0 w-10 h-10 rounded-md border flex items-center justify-center',
               'bg-background hover:bg-muted transition-colors',
-              markerColor === 'pickup' ? 'border-coral-200 text-coral-500' : 'border-navy-200 text-navy-900'
+              markerColor === 'pickup' ? 'border-coral-200 text-coral-500' : 'border-navy-200 text-navy-900',
+              glass && glassButton
             )}
             title="Use my current location"
           >
@@ -200,7 +211,8 @@ export function LocationPicker({
             className={cn(
               'flex-shrink-0 w-10 h-10 rounded-md border flex items-center justify-center',
               'bg-background hover:bg-muted transition-colors',
-              markerColor === 'pickup' ? 'border-coral-200 text-coral-500' : 'border-navy-200 text-navy-900'
+              markerColor === 'pickup' ? 'border-coral-200 text-coral-500' : 'border-navy-200 text-navy-900',
+              glass && glassButton
             )}
             title="Select on map"
           >
@@ -210,18 +222,26 @@ export function LocationPicker({
 
         {/* Suggestions dropdown */}
         {showDropdown && suggestions.length > 0 && (
-          <div className="absolute z-50 w-full mt-1 bg-background border rounded-lg shadow-lg max-h-60 overflow-auto">
+          <div
+            className={cn(
+              'absolute z-50 w-full mt-1 border rounded-lg shadow-lg max-h-60 overflow-auto',
+              glass ? glassDropdown : 'bg-background'
+            )}
+          >
             {suggestions.map((result) => (
               <button
                 key={result.id}
                 type="button"
                 onClick={() => handleSelectPlace(result)}
-                className="w-full px-4 py-3 text-left hover:bg-muted transition-colors border-b last:border-b-0"
+                className={cn(
+                  'w-full px-4 py-3 text-left transition-colors border-b last:border-b-0',
+                  glass ? 'hover:bg-white/60 border-white/40 text-navy-900' : 'hover:bg-muted'
+                )}
               >
                 <p className="font-medium text-sm truncate">
                   {result.shortName}
                 </p>
-                <p className="text-xs text-muted-foreground truncate">
+                <p className={cn('text-xs truncate', glass ? 'text-navy-900/60' : 'text-muted-foreground')}>
                   {result.secondaryText}
                 </p>
               </button>
