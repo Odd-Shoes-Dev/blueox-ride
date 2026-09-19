@@ -6,12 +6,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar'
 // avatar leads, and Login/Register are where a guest's Sign In would lead.
 const NO_ACCOUNT_CORNER = ['/profile', '/login', '/register']
 
-// Shared corner buttons for every page except the landing page (which has its
-// own logo pill and avatar/sign-in in the hero). Top-left: the logo, always
-// linking home. Top-right: the signed-in user's avatar (links to their profile)
-// or a Sign In pill for guests. They scroll with the page rather than floating,
-// so they never cover content you're reading, and they're sized to fit in the
-// 3rem of space above each page header's back button.
+// Corner buttons for the STANDALONE pages (login, register, privacy, terms,
+// payment, admin) — the ones that have their own URL and layout instead of
+// opening as a panel over the map. (Map screens get the same buttons from
+// MapShell.) Top-left: the logo, always linking home. Top-right: the signed-in
+// user's avatar (links to their profile) or a Sign In pill for guests. They
+// scroll with the page rather than floating, so they never cover content
+// you're reading, and they're sized to fit in the 3rem of space above each
+// page header's back button.
 export function SiteLogoLayout() {
   const { user, profile } = useAuth()
   const { pathname } = useLocation()

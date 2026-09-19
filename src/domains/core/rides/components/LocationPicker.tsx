@@ -4,6 +4,7 @@ import { MapLocationPicker } from './MapLocationPicker'
 import { MapPin, Loader2, X, Map, Navigation } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { searchPlaces, reverseGeocode, type PlaceSuggestion } from '@/shared/services/geocoding'
+import { useOptionalMapShell } from '@/domains/core/rides/map/MapShellContext'
 
 interface Location {
   lat: number
@@ -41,6 +42,7 @@ export function LocationPicker({
   glass = false,
   onPickOnMap,
 }: LocationPickerProps) {
+  const shell = useOptionalMapShell()
   const [input, setInput] = useState(value?.name || '')
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([])
   const [loading, setLoading] = useState(false)
@@ -157,6 +159,22 @@ export function LocationPicker({
     onChange(location)
   }
 
+  // "Select on map": use the caller's own handler if given; otherwise, inside the
+  // app's shared-map layout, place the pin on that map; otherwise fall back to
+  // the full-screen picker modal (standalone pages).
+  const handlePickOnMap = async () => {
+    if (onPickOnMap) return onPickOnMap()
+    if (shell) {
+      const point = await shell.requestPin(markerColor, value)
+      if (point) {
+        setInput(point.name)
+        onChange(point)
+      }
+      return
+    }
+    setShowMapPicker(true)
+  }
+
   // Clear location
   const handleClear = () => {
     setInput('')
@@ -213,7 +231,7 @@ export function LocationPicker({
           </button>
           <button
             type="button"
-            onClick={() => (onPickOnMap ? onPickOnMap() : setShowMapPicker(true))}
+            onClick={handlePickOnMap}
             className={cn(
               'flex-shrink-0 w-10 h-10 rounded-md border flex items-center justify-center',
               'bg-background hover:bg-muted transition-colors',

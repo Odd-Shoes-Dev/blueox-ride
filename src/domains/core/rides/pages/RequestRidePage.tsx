@@ -7,6 +7,7 @@ import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
 import { Card, CardContent } from '@/shared/ui/card'
 import { LocationPicker } from '@/domains/core/rides/components/LocationPicker'
+import { useMapPins } from '@/domains/core/rides/map/MapShellContext'
 import { useToast } from '@/shared/hooks/use-toast'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { formatCurrency } from '@/shared/lib/utils'
@@ -28,6 +29,7 @@ export default function RequestRidePage() {
 
   const [origin, setOrigin] = useState<Location | null>(prefill?.origin ?? null)
   const [destination, setDestination] = useState<Location | null>(prefill?.destination ?? null)
+  useMapPins(origin, destination) // show the route's ends on the shared map
   const [departureDate, setDepartureDate] = useState('')
   const [departureTime, setDepartureTime] = useState('')
   const [budget, setBudget] = useState('')
@@ -117,7 +119,7 @@ export default function RequestRidePage() {
   const budgetNum = parseInt(budget) || 0
 
   return (
-    <div className="min-h-screen bg-background pb-8">
+    <div className="min-h-full bg-background pb-8">
       {/* Header */}
       <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
         <PageContainer>

@@ -8,14 +8,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/dialog'
 import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
-import { MapView } from '@/domains/core/rides/components/MapView'
 import { RideDetailsSEO } from '@/shared/components/SEO'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { useToast } from '@/shared/hooks/use-toast'
 import { getStoredChurchId } from '@/shared/lib/churchAttribution'
 import { formatCurrency, formatDate, calculateBookingFee } from '@/shared/lib/utils'
-import { useDriverLocationSharing } from '@/domains/core/rides/hooks/useDriverLocationSharing'
-import { useLiveDriverLocation } from '@/domains/core/rides/hooks/useLiveDriverLocation'
+import { useOptionalMapShell } from '@/domains/core/rides/map/MapShellContext'
+import { useRideRouteOnMap, formatDistance, formatDuration } from '@/domains/core/rides/hooks/useRideRouteOnMap'
 import type { Booking } from '@/shared/types'
 import { ArrowLeft, Calendar, Users, Star, Phone, MessageCircle, Clock, Info, Car, Navigation, Loader2 } from 'lucide-react'
 
@@ -40,23 +39,30 @@ export default function RideDetailsPage() {
   const canTrackLive = !!ride && (ride.status === 'active' || ride.status === 'full')
   const isConfirmedPassenger = existingBooking?.status === 'confirmed'
 
-  const locationSharing = useDriverLocationSharing(id || '')
-  const liveDriverLocation = useLiveDriverLocation(
-    id || '',
-    canTrackLive && !isDriver && isConfirmedPassenger
+  // Live trip (runs in the app shell, so it keeps going when this panel is closed):
+  // the driver starts/ends it here; a confirmed passenger automatically follows the driver.
+  const shell = useOptionalMapShell()
+  const watchDriver = shell?.watchDriver
+  const isMyTrip = shell?.liveTrip?.role === 'driver' && shell.liveTrip.ride.id === id
+  const driverSeen = shell?.liveTrip?.ride.id === id && shell?.livePosition != null
+
+  // Show this ride on the app's main map (road route) rather than a second map inside
+  // the panel. The route stays on the map after this panel closes.
+  const { summary: routeSummary, loading: routeLoading } = useRideRouteOnMap(
+    ride && ride.origin_lat && ride.origin_lng && ride.destination_lat && ride.destination_lng ? ride : null
   )
+
+  useEffect(() => {
+    if (ride && watchDriver && canTrackLive && !isDriver && isConfirmedPassenger) watchDriver(ride)
+    // Re-run when the ride or the passenger's status changes, not on every refetch of the object.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ride?.id, canTrackLive, isDriver, isConfirmedPassenger, watchDriver])
 
   useEffect(() => {
     if (id) {
       fetchRide()
     }
   }, [id])
-
-  // Stop sharing location if the driver navigates away without pressing "Stop"
-  useEffect(() => {
-    return () => locationSharing.stop()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   useEffect(() => {
     if (profile?.phone_number) {
@@ -180,7 +186,7 @@ export default function RideDetailsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-[50dvh] flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     )
@@ -205,7 +211,7 @@ export default function RideDetailsPage() {
         price={ride.price}
         rideId={id || ''}
       />
-      <div className="min-h-screen bg-background pb-40">
+      <div className="min-h-full bg-background pb-6">
         {/* Header */}
         <div className="bg-header text-header-foreground pt-12 pb-20 px-4">
           <PageContainer>
@@ -256,6 +262,29 @@ export default function RideDetailsPage() {
                   </div>
                 </div>
 
+                {(routeSummary || routeLoading) && (
+                  <div className="flex items-center gap-6 pt-4 border-t text-sm">
+                    {routeSummary ? (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Navigation className="w-4 h-4 text-coral-500" />
+                          <span className="font-medium">{formatDistance(routeSummary.distanceKm)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Clock className="w-4 h-4" />
+                          <span>~{formatDuration(routeSummary.durationMin)}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">shown on the map</span>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Working out the route...
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {ride.notes && (
                   <div className="pt-4 border-t">
                     <p className="text-sm text-muted-foreground mb-1">Notes</p>
@@ -266,59 +295,37 @@ export default function RideDetailsPage() {
             </CardContent>
           </Card>
 
-          {/* Route Map */}
-          {ride.origin_lat && ride.origin_lng && ride.destination_lat && ride.destination_lng && (
-            <Card>
-              <CardContent className="p-0 overflow-hidden">
-                <MapView
-                  origin={{
-                    lat: ride.origin_lat,
-                    lng: ride.origin_lng,
-                    name: ride.origin_name,
-                  }}
-                  destination={{
-                    lat: ride.destination_lat,
-                    lng: ride.destination_lng,
-                    name: ride.destination_name,
-                  }}
-                  showRoute={true}
-                  height="200px"
-                  driverLocation={!isDriver ? liveDriverLocation : null}
-                />
-              </CardContent>
-            </Card>
-          )}
-
           {/* Live Location Sharing - driver's own control */}
           {isDriver && canTrackLive && (
             <Card>
               <CardContent className="p-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm">
-                  <Navigation className={`w-4 h-4 ${locationSharing.sharing ? 'text-green-600' : 'text-muted-foreground'}`} />
+                  <Navigation className={`w-4 h-4 ${isMyTrip ? 'text-green-600' : 'text-muted-foreground'}`} />
                   <span>
-                    {locationSharing.sharing
-                      ? 'Sharing your location with passengers'
-                      : 'Share your location so passengers can see you coming'}
+                    {isMyTrip
+                      ? 'Trip in progress — your position is shared live and shown on the map'
+                      : 'Start the trip to share your live position, see distance left, and keep the screen on'}
                   </span>
                 </div>
                 <Button
                   size="sm"
-                  variant={locationSharing.sharing ? 'outline' : 'default'}
-                  onClick={() => locationSharing.sharing ? locationSharing.stop() : locationSharing.start()}
+                  variant={isMyTrip ? 'outline' : 'default'}
+                  onClick={() => (isMyTrip ? shell?.stopLiveTrip() : ride && shell?.startDriverTrip(ride))}
+                  disabled={!shell}
                 >
-                  {locationSharing.sharing ? 'Stop' : 'Start'}
+                  {isMyTrip ? 'End trip' : 'Start trip'}
                 </Button>
               </CardContent>
-              {locationSharing.error && (
+              {shell?.liveError && !isMyTrip && (
                 <CardContent className="pt-0 pb-4 -mt-2">
-                  <p className="text-xs text-destructive">{locationSharing.error}</p>
+                  <p className="text-xs text-destructive">{shell.liveError}</p>
                 </CardContent>
               )}
             </Card>
           )}
 
           {/* Live Location Sharing - passenger's status caption */}
-          {!isDriver && canTrackLive && isConfirmedPassenger && !liveDriverLocation && (
+          {!isDriver && canTrackLive && isConfirmedPassenger && !driverSeen && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground px-1">
               <Loader2 className="w-4 h-4 animate-spin" />
               Waiting for the driver to start sharing their location...
@@ -540,7 +547,7 @@ export default function RideDetailsPage() {
 
       {/* Book Button - positioned above BottomNav */}
       {canBook && (
-        <div className="fixed bottom-16 left-0 right-0 p-4 bg-background border-t z-40">
+        <div className="sticky bottom-0 p-4 bg-background border-t z-40">
           <PageContainer>
             <Button className="w-full" size="lg" onClick={() => setShowBookingDialog(true)}>
               Book Seat - {formatCurrency(bookingFee)} to reserve
@@ -551,7 +558,7 @@ export default function RideDetailsPage() {
 
       {/* Login to Book Button - for guests */}
       {showLoginToBook && (
-        <div className="fixed bottom-16 left-0 right-0 p-4 bg-background border-t z-40">
+        <div className="sticky bottom-0 p-4 bg-background border-t z-40">
           <PageContainer>
             <Button
               className="w-full"

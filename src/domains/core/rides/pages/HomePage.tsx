@@ -1,34 +1,24 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { ridesRepository, rideRequestsRepository, withTimeout, RequestTimeoutError } from '@/shared/services/database'
+import { rideRequestsRepository } from '@/shared/services/database'
 import { useAuth } from '@/domains/core/auth/AuthContext'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
 import { LocationPicker } from '@/domains/core/rides/components/LocationPicker'
-import { HeroLiveMap } from '@/domains/core/rides/components/HeroLiveMap'
-import { MapPlaceSearch } from '@/domains/core/rides/components/MapPlaceSearch'
-import type { PinKind } from '@/domains/core/rides/components/mapPins'
 import { HomePageSEO } from '@/shared/components/SEO'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { formatCurrency, formatDate } from '@/shared/lib/utils'
-import { reverseGeocode } from '@/shared/services/geocoding'
-import { Search, Calendar, Users, Star, Plus, ArrowRight, RefreshCw, Shield, Wallet, UserCheck, MessageSquare, Loader2, MapPin, ChevronDown } from 'lucide-react'
+import { useMapShell, type RideWithDriver } from '@/domains/core/rides/map/MapShellContext'
+import { RoutePreviewChip } from '@/domains/core/rides/components/RoutePreviewChip'
+import { Search, Calendar, Users, Star, Plus, ArrowRight, RefreshCw, Shield, Wallet, UserCheck, MessageSquare, Loader2, MapPin } from 'lucide-react'
 import type { BrandColors } from '@/shared/types/branding'
 
-// Semi-transparent white surface for controls floating over the hero map. Text on it is
+// Semi-transparent white surface for controls floating over the map. Text on it is
 // always navy (not theme-dependent) since what's behind it is the map, not the page.
-// `pointer-events-auto` because the full-width positioning wrappers around these are
+// `pointer-events-auto` because the positioning wrappers around these are
 // `pointer-events-none` — otherwise the empty space beside each control would swallow
 // taps/drags meant for the map underneath.
 const GLASS = 'bg-white/80 border border-white/50 shadow-lg pointer-events-auto'
-
-interface Location {
-  lat: number
-  lng: number
-  name: string
-}
-
-type RideWithDriver = ridesRepository.RideWithDriverRow
 
 interface HomePageProps {
   // Optional brand colors for church theming
@@ -38,38 +28,37 @@ interface HomePageProps {
   churchLogoUrl?: string
 }
 
+// The home screen. The map itself lives in the app's persistent MapShell behind
+// this; this page is (1) a transparent, click-through window onto that map with
+// the search card floating in it, then (2) the content that scrolls up over the map.
+// Search state (trip, pins, results) is held by the shell so it survives opening
+// and closing panels.
 export default function HomePage({
   brandColors,
   churchName,
   churchLogoUrl,
 }: HomePageProps = {}) {
-  const { user, profile } = useAuth()
-  const [searchOrigin, setSearchOrigin] = useState<Location | null>(null)
-  const [searchDestination, setSearchDestination] = useState<Location | null>(null)
-  const [locatingUser, setLocatingUser] = useState(true)
-  const [geoFailed, setGeoFailed] = useState(false)
-  const [manualPickupOverride, setManualPickupOverride] = useState(false)
-  // Which pin the user is currently placing on the hero map (null = none).
-  const [editingPin, setEditingPin] = useState<PinKind | null>(null)
-  // Place search (top-right): just moves the map, never touches the trip fields.
-  const [placeSearchOpen, setPlaceSearchOpen] = useState(false)
-  const [mapFocus, setMapFocus] = useState<{ lat: number; lng: number } | null>(null)
-  // Latest map centre, used to rank place-search results near what's on screen.
-  // A ref (not state) — it changes on every pan and nothing needs to re-render.
-  const mapCenterRef = useRef<{ lat: number; lng: number } | null>(null)
-  const [rides, setRides] = useState<RideWithDriver[]>([])
+  const { user } = useAuth()
+  const shell = useMapShell()
+  const {
+    rides,
+    ridesLoading: loading,
+    ridesError: error,
+    refreshRides: fetchRides,
+    searching,
+    origin: searchOrigin,
+    destination: searchDestination,
+    setOrigin: setSearchOrigin,
+    setDestination: setSearchDestination,
+    locatingUser,
+    usingAutoPickup,
+    setManualPickupOverride,
+  } = shell
+  const placingPin = shell.editing !== null
+  const myNextRide = user ? shell.myRides[0] : undefined
+  // A live trip bar sits at the top of the map, so the cards below it shift down to make room.
+  const tripOffsetRem = shell.liveTrip ? 6.5 : 0
   const [openRequestCount, setOpenRequestCount] = useState<number | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [searching, setSearching] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const hasFetched = useRef(false)
-  const heroRef = useRef<HTMLDivElement>(null)
-
-  const scrollPastHero = () => {
-    const hero = heroRef.current
-    if (!hero) return
-    window.scrollTo({ top: hero.offsetTop + hero.offsetHeight, behavior: 'smooth' })
-  }
 
   // Memoize dynamic styles based on brand colors
   const brandStyles = useMemo(() => {
@@ -95,34 +84,6 @@ export default function HomePage({
     }
   }, [brandColors])
 
-  const fetchRides = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const data = await withTimeout(ridesRepository.searchActiveRides({ limit: 20 }), 15000)
-      setRides(data)
-    } catch (err) {
-      if (err instanceof RequestTimeoutError) {
-        console.error('Request timed out')
-        setError('Request timed out. Please check your connection.')
-      } else {
-        console.error('Fetch error:', err)
-        setError('An error occurred. Please try again.')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    // Only fetch once on mount
-    if (!hasFetched.current) {
-      hasFetched.current = true
-      fetchRides()
-    }
-  }, [fetchRides])
-
   // Show drivers a concrete demand signal ("N riders waiting") instead of a
   // generic "check for requests" link — value visible immediately, no click required.
   useEffect(() => {
@@ -132,168 +93,24 @@ export default function HomePage({
       .catch(() => setOpenRequestCount(null))
   }, [])
 
-  // Auto-detected pickup is a full reverse-geocoded address (e.g. "Kampala
-  // Road, Kampala"), which rarely appears verbatim in a driver-typed
-  // origin_name — filtering on it would silently return nothing. Only use
-  // the origin as a text filter once the user (or the geo-fallback form)
-  // explicitly picked it themselves.
-  const usingAutoPickup = !geoFailed && !manualPickupOverride
-
-  const searchRides = async () => {
-    // Prevent search if already searching
-    if (searching) return
-
-    setSearching(true)
-    setLoading(true)
-    setError(null)
-
-    try {
-      const data = await withTimeout(
-        ridesRepository.searchActiveRides({
-          originName: usingAutoPickup ? undefined : searchOrigin?.name,
-          destinationName: searchDestination?.name,
-          limit: 50,
-        }),
-        15000
-      )
-      setRides(data)
-    } catch (err) {
-      if (err instanceof RequestTimeoutError) {
-        console.error('Search timed out')
-        setError('Search timed out. Please try again.')
-      } else {
-        console.error('Search error:', err)
-        setError('An error occurred. Please try again.')
-      }
-    } finally {
-      setLoading(false)
-      setSearching(false)
-    }
-  }
-
-  const handleHeroLocationFound = (coords: { lat: number; lng: number }) => {
-    // The map can report several times as the reading sharpens or the user
-    // presses its locate button. Once they've chosen their own pickup ("Change"),
-    // don't overwrite it.
-    if (manualPickupOverride) {
-      setLocatingUser(false)
-      return
-    }
-    reverseGeocode(coords.lat, coords.lng)
-      .then((name) => setSearchOrigin({ ...coords, name }))
-      .catch(() => setSearchOrigin({ ...coords, name: 'Current location' }))
-      .finally(() => setLocatingUser(false))
-  }
-
-  const handleHeroLocationUnavailable = () => {
-    setGeoFailed(true)
-    setLocatingUser(false)
-  }
-
-  const handlePlaceSelect = (place: { lat: number; lng: number }) => {
-    setMapFocus({ lat: place.lat, lng: place.lng })
-    setPlaceSearchOpen(false)
-  }
-
-  const handlePinConfirm = (kind: PinKind, point: Location) => {
-    if (kind === 'pickup') setSearchOrigin(point)
-    else setSearchDestination(point)
-    setEditingPin(null)
-  }
-
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    searchRides()
+    shell.searchRides()
   }
 
   return (
     <>
       <HomePageSEO />
-      <div className="min-h-screen bg-background pb-24">
-        {/* Hero Section — full-bleed live map with semi-transparent white
-            floating controls (fixed dark text, so they stay readable over
-            any map colour in either theme). No headline here by design —
-            just map + search. */}
-      {/* Full viewport height (dvh so mobile browser chrome doesn't push the
-          bottom edge off-screen). Everyone has the fixed bottom nav (h-16), so
-          subtract it to keep the map's bottom edge and attribution visible. */}
-      <div
-        ref={heroRef}
-        className="relative overflow-hidden h-[calc(100dvh-4rem)] min-h-[520px]"
-      >
-        <HeroLiveMap
-          rides={rides}
-          className="absolute inset-0"
-          onLocationFound={handleHeroLocationFound}
-          onLocationUnavailable={handleHeroLocationUnavailable}
-          // In auto-pickup mode the start is the user's own dot, not a pin.
-          origin={usingAutoPickup ? null : searchOrigin}
-          destination={searchDestination}
-          editing={editingPin}
-          focus={mapFocus}
-          onViewChange={(center) => {
-            mapCenterRef.current = center
-          }}
-          onEditConfirm={handlePinConfirm}
-          onEditCancel={() => setEditingPin(null)}
-        />
 
-        {/* Top row: logo pill (left) + sign-in/avatar pill (right) */}
-        {/* z-30 (above the search card's z-20) so the place-search suggestions can overlap it. */}
-        <div className="absolute top-4 inset-x-4 z-30 flex items-center justify-between pointer-events-none">
-          <Link
-            to="/"
-            aria-label="Blue OX Rides home"
-            className={`flex items-center gap-2 rounded-full pl-2 pr-4 py-2 hover:bg-white/90 transition-colors ${GLASS} ${placeSearchOpen ? 'max-sm:hidden' : ''}`}
-          >
-            <img
-              src="/assets/logo1.png"
-              alt=""
-              className="w-7 h-7 object-contain"
-            />
-            <span className="font-bold text-navy-900 text-sm">Blue OX Rides</span>
-          </Link>
-          {/* Right cluster. Search is a place finder for the map only: it expands
-              into a field, and picking a result just moves the map there. On
-              phones the open field takes the whole row (logo/sign-in hide). */}
-          <div className={`flex items-center gap-2 ${placeSearchOpen ? 'flex-1 justify-end' : ''}`}>
-            {placeSearchOpen ? (
-              <MapPlaceSearch
-                onSelect={handlePlaceSelect}
-                onClose={() => setPlaceSearchOpen(false)}
-                getNearby={() => mapCenterRef.current}
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setPlaceSearchOpen(true)}
-                aria-label="Search places on the map"
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-navy-900 hover:bg-white/90 transition-colors ${GLASS}`}
-              >
-                <Search className="w-5 h-5" />
-              </button>
-            )}
-            <div className={`flex-shrink-0 whitespace-nowrap ${placeSearchOpen ? 'max-sm:hidden' : ''}`}>
-              {user ? (
-                <Link to="/profile">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-navy-900 font-semibold ${GLASS}`}>
-                    {profile?.full_name?.[0]?.toUpperCase() || '?'}
-                  </div>
-                </Link>
-              ) : (
-                <Link to="/login">
-                  <div className={`px-4 py-2.5 rounded-full text-navy-900 text-sm font-medium hover:bg-white/80 transition-colors ${GLASS}`}>
-                    Sign In
-                  </div>
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-
+      {/* Window onto the map (full screen minus the 4rem bottom nav). Click-through
+          so the map underneath stays draggable; only the cards in it take clicks. */}
+      <div className="relative h-[calc(100dvh-4rem)]">
         {/* Church banner - its own floating pill, below the top row */}
         {churchName && (
-          <div className="absolute top-20 inset-x-4 z-10 flex justify-center pointer-events-none">
+          <div
+            className="absolute inset-x-4 z-10 flex justify-center pointer-events-none"
+            style={{ top: `${5 + tripOffsetRem}rem` }}
+          >
             <div className={`inline-flex items-center gap-3 rounded-xl px-4 py-2 text-navy-900 ${GLASS}`}>
               {churchLogoUrl ? (
                 <img
@@ -317,9 +134,11 @@ export default function HomePage({
 
         {/* Search widget — floating card directly on the map. Hidden (not
             unmounted, so typed text survives) while a pin is being placed, so
-            the map is fully visible. */}
+            the map is fully visible. The fields' "select on map" buttons place
+            their pin on the shared map themselves (see LocationPicker). */}
         <div
-          className={`absolute inset-x-4 z-20 pointer-events-none ${churchName ? 'top-36' : 'top-20'} ${editingPin ? 'hidden' : ''}`}
+          className={`absolute inset-x-4 z-20 pointer-events-none ${placingPin ? 'hidden' : ''}`}
+          style={{ top: `${(churchName ? 9 : 5) + tripOffsetRem}rem` }}
         >
           <div className="max-w-md mx-auto">
             <Card className={`shadow-xl text-navy-900 ${GLASS}`}>
@@ -350,7 +169,6 @@ export default function HomePage({
                       placeholder="Where are you going?"
                       markerColor="dropoff"
                       glass
-                      onPickOnMap={() => setEditingPin('dropoff')}
                     />
                     <Button type="submit" className="w-full" size="lg" disabled={searching || !searchDestination}>
                       {searching ? (
@@ -374,7 +192,6 @@ export default function HomePage({
                       placeholder="Leaving from..."
                       markerColor="pickup"
                       glass
-                      onPickOnMap={() => setEditingPin('pickup')}
                     />
                     <LocationPicker
                       value={searchDestination}
@@ -382,7 +199,6 @@ export default function HomePage({
                       placeholder="Going to..."
                       markerColor="dropoff"
                       glass
-                      onPickOnMap={() => setEditingPin('dropoff')}
                     />
                     <Button type="submit" className="w-full" size="lg" disabled={searching}>
                       {searching ? (
@@ -401,24 +217,38 @@ export default function HomePage({
                 )}
               </CardContent>
             </Card>
+
+            {/* A ride whose route the user chose to see stays on the map until cleared */}
+            {shell.previewedRide && (
+              <RoutePreviewChip
+                className="mt-3"
+                origin={shell.previewedRide.origin_name}
+                destination={shell.previewedRide.destination_name}
+                summary={shell.featured?.summary ?? null}
+                loading={shell.featuredStatus === 'loading'}
+                onClear={() => shell.previewRide(null)}
+              />
+            )}
+
+            {/* The driver's own next ride (its route is drawn on the map) */}
+            {myNextRide && !shell.previewedRide && (
+              <Link
+                to={`/rides/${myNextRide.id}`}
+                className={`mt-3 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm text-navy-900 hover:bg-white/90 transition-colors ${GLASS}`}
+              >
+                <Star className="w-4 h-4 flex-shrink-0" />
+                <span className="truncate">
+                  <strong>Your next ride</strong> · {myNextRide.origin_name} → {myNextRide.destination_name}
+                </span>
+                <span className="ml-auto pl-2 text-xs text-navy-900/70 whitespace-nowrap">{formatDate(myNextRide.departure_time)}</span>
+              </Link>
+            )}
           </div>
         </div>
-
-        {/* Scroll-down FAB — the map fills the screen and captures drag/wheel
-            gestures, so the page itself can't be scrolled from here. Sits above
-            the map's attribution in the bottom-right corner. */}
-        {!editingPin && (
-          <button
-            type="button"
-            onClick={scrollPastHero}
-            aria-label="Scroll to more"
-            className={`absolute bottom-8 right-4 z-20 w-12 h-12 rounded-full flex items-center justify-center text-navy-900 hover:bg-white/90 transition-colors ${GLASS}`}
-          >
-            <ChevronDown className="w-6 h-6" />
-          </button>
-        )}
       </div>
 
+      {/* Everything below scrolls up over the map */}
+      <div className="bg-background pb-24 pointer-events-auto">
       {/* Value Props - Only show to non-logged in users */}
       {!user && (
         <div 

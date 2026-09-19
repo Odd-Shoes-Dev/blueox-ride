@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/shared/contexts/ThemeContext'
 import { Toaster } from '@/shared/ui/toaster'
 import { BottomNav } from '@/app/BottomNav'
 import { SiteLogoLayout } from '@/app/SiteLogoLayout'
+import { MapShell } from '@/app/MapShell'
 
 // Pages
 import HomePage from '@/domains/core/rides/pages/HomePage'
@@ -39,7 +40,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-[60dvh] flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     )
@@ -63,6 +64,18 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   )
 }
 
+// Screens that open as a panel over the map (see MapShell). Anything not listed
+// here and not standalone below is the home screen. Order doesn't matter.
+const PANEL_ROUTES: { path: string; element: React.ReactNode }[] = [
+  { path: '/search', element: <SearchPage /> },
+  { path: '/rides/:id', element: <RideDetailsPage /> },
+  { path: '/requests', element: <RideRequestsPage /> },
+  { path: '/rides/create', element: <ProtectedRoute><CreateRidePage /></ProtectedRoute> },
+  { path: '/requests/new', element: <ProtectedRoute><RequestRidePage /></ProtectedRoute> },
+  { path: '/my-rides', element: <ProtectedRoute><MyRidesPage /></ProtectedRoute> },
+  { path: '/profile', element: <ProtectedRoute><ProfilePage /></ProtectedRoute> },
+]
+
 function AppRoutes() {
   const { loading } = useAuth()
 
@@ -84,78 +97,45 @@ function AppRoutes() {
   return (
     <AppLayout>
       <Routes>
-        {/* Landing page has its own logo, so it sits outside the logo layout */}
-        <Route path="/" element={<HomePage />} />
+        {/* One persistent map with every screen shown on top of it: the home
+            screen scrolls over the map, the rest open as a side panel (desktop)
+            or bottom sheet (phones). Moving between them never reloads the map. */}
+        <Route element={<MapShell panelPaths={PANEL_ROUTES.map((route) => route.path)} />}>
+          <Route path="/" element={<HomePage />} />
+          {PANEL_ROUTES.map((route) => (
+            <Route key={route.path} path={route.path} element={route.element} />
+          ))}
 
-        {/* Every other page gets the corner logo (home shortcut) from SiteLogoLayout */}
-        <Route element={<SiteLogoLayout />}>
-        {/* Auth routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-
-        {/* PUBLIC routes - anyone can browse */}
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/rides/:id" element={<RideDetailsPage />} />
-        <Route path="/requests" element={<RideRequestsPage />} />
-        <Route path="/privacy" element={<PrivacyPolicyPage />} />
-        <Route path="/terms" element={<TermsPage />} />
-
-        {/* PROTECTED routes - require login */}
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <ProfilePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/rides/create"
-          element={
-            <ProtectedRoute>
-              <CreateRidePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/requests/new"
-          element={
-            <ProtectedRoute>
-              <RequestRidePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/bookings/:id/pay"
-          element={
-            <ProtectedRoute>
-              <PaymentPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/my-rides"
-          element={
-            <ProtectedRoute>
-              <MyRidesPage />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Admin routes */}
-        <Route
-          path="/admin/church-payouts"
-          element={
-            <ProtectedRoute>
-              <AdminChurchPayoutsPage />
-            </ProtectedRoute>
-          }
-        />
+          {/* Church-specific landing pages - the home screen with church branding.
+              Static routes outrank this, so it only catches church slugs.
+              Routes: /watoto, /worshipharvest, /holycity, /miraclecenter, /phaneroo */}
+          <Route path="/:churchSlug" element={<ChurchLandingPage />} />
         </Route>
 
-        {/* Church-specific landing pages - must be after all static routes */}
-        {/* Routes: /watoto, /worshipharvest, /holycity, /miraclecenter, /phaneroo */}
-        <Route path="/:churchSlug" element={<ChurchLandingPage />} />
+        {/* Standalone pages (own URL, own layout, no map): they get the corner
+            logo and account button from SiteLogoLayout */}
+        <Route element={<SiteLogoLayout />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route
+            path="/bookings/:id/pay"
+            element={
+              <ProtectedRoute>
+                <PaymentPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/church-payouts"
+            element={
+              <ProtectedRoute>
+                <AdminChurchPayoutsPage />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
 
         {/* Catch all */}
         <Route path="*" element={<Navigate to="/" replace />} />

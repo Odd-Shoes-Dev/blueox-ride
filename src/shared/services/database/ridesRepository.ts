@@ -53,6 +53,21 @@ export async function searchActiveRides(filters: RideSearchFilters = {}): Promis
   return data as RideWithDriverRow[]
 }
 
+// A driver's own upcoming rides (soonest first) — used to show "your ride" on the map.
+export async function getUpcomingRidesForDriver(driverId: string, limit = 5): Promise<RideWithDriverRow[]> {
+  const { data, error } = await supabase
+    .from('rides_with_driver')
+    .select('*')
+    .eq('driver_id', driverId)
+    .in('status', ['active', 'full'])
+    .gt('departure_time', new Date().toISOString())
+    .order('departure_time', { ascending: true })
+    .limit(limit)
+
+  if (error) throw error
+  return data as RideWithDriverRow[]
+}
+
 export interface RideWithDriverDetail extends Ride {
   driver: User
   car_photo?: CarPhoto

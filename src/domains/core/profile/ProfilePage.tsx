@@ -124,14 +124,14 @@ export default function ProfilePage() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-[50dvh] flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-full bg-background pb-8">
       {/* Header */}
       <div className="bg-gradient-to-b from-navy-900 to-navy-800 pt-12 pb-24 px-4">
         <h1 className="text-xl font-semibold text-white text-center">Profile</h1>
