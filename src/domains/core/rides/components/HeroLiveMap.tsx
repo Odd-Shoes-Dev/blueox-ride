@@ -164,14 +164,16 @@ function makeDriverIcon(heading: number | null): L.DivIcon {
 
 const DEFAULT_ZOOM = 12 // city-wide view, used until we know exactly where the visitor is
 
-// Location quality. The first reading a device gives is often a rough guess
-// (Wi-Fi / mobile tower / IP) that GPS then sharpens over the next seconds, so
-// we keep listening briefly and only trust a reading as "the pickup" once it
-// is accurate enough — or after a short deadline, whichever comes first.
-const GOOD_ACCURACY_M = 100 // accurate enough to zoom to street level and use as the pickup
+// Location: two requests run at once. A QUICK one (Wi-Fi / mobile towers, or the phone's
+// very recent position) usually answers in a second or two but may be rough; a PRECISE one
+// (GPS) is exact but can take 10-30 s on a phone that hasn't used GPS lately. The quick answer
+// puts a dot on the map straight away (with its accuracy circle) and GPS then sharpens it.
+const GOOD_ACCURACY_M = 100 // accurate enough to zoom to street level and stop saying "refining"
 const DONE_ACCURACY_M = 25 // no point refining further
-const REPORT_DEADLINE_MS = 6000 // report the best reading so far if it never gets "good"
-const WATCH_MAX_MS = 20000 // stop listening (saves battery) after this long
+const QUICK_TIMEOUT_MS = 5000
+const QUICK_MAX_AGE_MS = 30_000 // a phone reading up to this old is fine for a first guess
+const PRECISE_TIMEOUT_MS = 30_000 // cold GPS starts can be slow, especially indoors
+const WATCH_MAX_MS = 30_000 // stop listening (saves battery) after this long
 const MIN_CIRCLE_M = 20 // below this the pulsing dot already says it all
 
 // How far to zoom for a reading of the given accuracy (metres) — a 2 km-wide
@@ -434,6 +436,7 @@ export function HeroLiveMap({
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null)
   const [accuracy, setAccuracy] = useState<number | null>(null) // metres; drawn as a circle round the dot
   const [locating, setLocating] = useState(false) // true only while waiting for the first reading
+  const [refining, setRefining] = useState(false) // a rough position is showing; GPS is still sharpening it
   const [isCentered, setIsCentered] = useState(false)
   // State (not a ref) so PinPlacer can render once the map instance exists.
   const [map, setMap] = useState<L.Map | null>(null)
@@ -447,7 +450,9 @@ export function HeroLiveMap({
   const hasFixRef = useRef(false)
   const reportedRef = useRef({ any: false, accurate: false })
   const latestFixRef = useRef<{ coords: [number, number]; accuracy: number } | null>(null)
-  const fallbackTriedRef = useRef(false)
+  const bestAccuracyRef = useRef(Infinity)
+  const quickFailedRef = useRef(false)
+  const preciseFailedRef = useRef(false)
 
   useEffect(() => {
     mapRef.current = map
@@ -460,16 +465,22 @@ export function HeroLiveMap({
     }
     timersRef.current.forEach(clearTimeout)
     timersRef.current = []
+    setRefining(false)
   }, [])
 
   // Handles every reading: moves the dot, draws the accuracy, keeps the map on
-  // it while following, and tells the parent when the reading is trustworthy.
+  // it while following, and tells the parent about it.
   const applyFix = useCallback(
-    (position: GeolocationPosition) => {
+    (position: GeolocationPosition, quick = false) => {
       const coords: [number, number] = [position.coords.latitude, position.coords.longitude]
       const acc = position.coords.accuracy
+
+      // A slow rough answer that arrives after a better one must not drag the dot backwards.
+      if (quick && hasFixRef.current && acc >= bestAccuracyRef.current) return
+
       const isFirst = !hasFixRef.current
       hasFixRef.current = true
+      bestAccuracyRef.current = Math.min(bestAccuracyRef.current, acc)
       latestFixRef.current = { coords, accuracy: acc }
 
       setUserLocation(coords)
@@ -483,10 +494,19 @@ export function HeroLiveMap({
         m.setView(coords, isFirst ? targetZoom : Math.max(m.getZoom(), targetZoom))
       }
 
+      // Tell the parent right away — however rough — so the search card and pickup are ready
+      // without waiting for GPS; and again once the reading is accurate, so the pickup improves.
       const report = () => onLocationFoundRef.current?.({ lat: coords[0], lng: coords[1] })
-      if (acc <= GOOD_ACCURACY_M && !reportedRef.current.accurate) {
-        reportedRef.current = { any: true, accurate: true }
+      if (!reportedRef.current.any) {
+        reportedRef.current.any = true
         report()
+      }
+      if (acc <= GOOD_ACCURACY_M) {
+        if (!reportedRef.current.accurate) {
+          reportedRef.current.accurate = true
+          report()
+        }
+        setRefining(false)
       }
 
       if (acc <= DONE_ACCURACY_M) stopLocating()
@@ -494,7 +514,7 @@ export function HeroLiveMap({
     [stopLocating]
   )
 
-  // Starts (or restarts) a fresh, high-accuracy reading — never a cached one.
+  // Starts (or restarts) a fresh reading: the quick and the precise request together.
   const startLocating = useCallback(() => {
     if (!navigator.geolocation) {
       onLocationUnavailableRef.current?.()
@@ -504,50 +524,46 @@ export function HeroLiveMap({
     stopLocating()
     hasFixRef.current = false
     reportedRef.current = { any: false, accurate: false }
-    fallbackTriedRef.current = false
+    bestAccuracyRef.current = Infinity
+    quickFailedRef.current = false
+    preciseFailedRef.current = false
     setLocating(true)
+    setRefining(true)
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      applyFix,
-      (error) => {
-        if (hasFixRef.current && error.code !== error.PERMISSION_DENIED) return // keep the reading we have
+    const giveUp = () => {
+      // Silent fallback to the default city view — this is decorative
+      // backdrop, not a required permission for using the app.
+      stopLocating()
+      setLocating(false)
+      onLocationUnavailableRef.current?.()
+    }
 
-        // No reading at all: some browsers/devices can't deliver high-accuracy
-        // fixes, so try once more in low-accuracy mode before giving up.
-        if (!fallbackTriedRef.current && error.code !== error.PERMISSION_DENIED) {
-          fallbackTriedRef.current = true
-          stopLocating()
-          navigator.geolocation.getCurrentPosition(
-            applyFix,
-            () => {
-              setLocating(false)
-              onLocationUnavailableRef.current?.()
-            },
-            { enableHighAccuracy: false, timeout: 8000, maximumAge: 60 * 1000 }
-          )
-          return
-        }
+    const onError = (which: 'quick' | 'precise') => (error: GeolocationPositionError) => {
+      if (error.code === error.PERMISSION_DENIED) {
+        giveUp()
+        return
+      }
+      if (which === 'quick') quickFailedRef.current = true
+      else preciseFailedRef.current = true
 
-        // Silent fallback to the default city view — this is decorative
-        // backdrop, not a required permission for using the app.
-        stopLocating()
-        setLocating(false)
-        onLocationUnavailableRef.current?.()
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    )
+      if (!hasFixRef.current && quickFailedRef.current && preciseFailedRef.current) giveUp()
+      // GPS never sharpened the rough position we already have — stop saying it's working on it.
+      else if (hasFixRef.current && which === 'precise') setRefining(false)
+    }
 
-    // If the reading never gets "good", still hand the parent the best one so far.
-    timersRef.current.push(
-      setTimeout(() => {
-        const latest = latestFixRef.current
-        if (latest && !reportedRef.current.any) {
-          reportedRef.current = { any: true, accurate: latest.accuracy <= GOOD_ACCURACY_M }
-          onLocationFoundRef.current?.({ lat: latest.coords[0], lng: latest.coords[1] })
-        }
-      }, REPORT_DEADLINE_MS),
-      setTimeout(stopLocating, WATCH_MAX_MS)
-    )
+    navigator.geolocation.getCurrentPosition((position) => applyFix(position, true), onError('quick'), {
+      enableHighAccuracy: false,
+      maximumAge: QUICK_MAX_AGE_MS,
+      timeout: QUICK_TIMEOUT_MS,
+    })
+
+    watchIdRef.current = navigator.geolocation.watchPosition((position) => applyFix(position, false), onError('precise'), {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: PRECISE_TIMEOUT_MS,
+    })
+
+    timersRef.current.push(setTimeout(stopLocating, WATCH_MAX_MS))
   }, [applyFix, stopLocating])
 
   useEffect(() => {
@@ -717,6 +733,14 @@ export function HeroLiveMap({
           onConfirm={(point) => onEditConfirm?.(editing.kind, point)}
           onCancel={() => onEditCancel?.()}
         />
+      )}
+
+      {/* A rough position is already showing; GPS is still making it exact */}
+      {refining && userLocation && !editing && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none flex items-center gap-2 rounded-full bg-white/90 border border-white/50 shadow-lg px-3 py-1.5 text-xs text-navy-900 whitespace-nowrap">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          Getting a more exact position…
+        </div>
       )}
 
       {/* Sits above the hero's scroll-down button (bottom-right), clear of the
