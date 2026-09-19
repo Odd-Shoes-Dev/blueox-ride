@@ -19,6 +19,8 @@ import RideRequestsPage from '@/domains/core/rides/pages/RideRequestsPage'
 import RequestRidePage from '@/domains/core/rides/pages/RequestRidePage'
 import ChurchLandingPage from '@/domains/church/ChurchLandingPage'
 import AdminChurchPayoutsPage from '@/domains/church/AdminChurchPayoutsPage'
+import PrivacyPolicyPage from '@/domains/core/legal/PrivacyPolicyPage'
+import TermsPage from '@/domains/core/legal/TermsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -65,7 +67,7 @@ function AppRoutes() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-navy-50 to-white">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-navy-50 to-white dark:bg-none dark:bg-background">
         <div className="text-center">
           <img
             src="/assets/logo.png"
@@ -90,6 +92,8 @@ function AppRoutes() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/rides/:id" element={<RideDetailsPage />} />
         <Route path="/requests" element={<RideRequestsPage />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
 
         {/* PROTECTED routes - require login */}
         <Route

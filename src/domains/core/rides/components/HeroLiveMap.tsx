@@ -31,6 +31,11 @@ interface HeroLiveMapProps {
   // fixed centre pin that the user positions by moving the map, and nothing
   // changes until they confirm — taps on the map never move a saved pin.
   editing?: PinKind | null
+  // Move the map to this spot (e.g. a place picked in the hero's place search).
+  // Pass a fresh object each time — the map flies whenever the object changes.
+  focus?: { lat: number; lng: number } | null
+  // Called with the map's centre each time it settles after a pan/zoom.
+  onViewChange?: (center: { lat: number; lng: number }) => void
   onEditConfirm?: (kind: PinKind, point: PlacedPoint) => void
   onEditCancel?: () => void
 }
@@ -143,6 +148,30 @@ function FitToPins({ points, suspended }: { points: [number, number][]; suspende
   return null
 }
 
+// Reports the map's centre whenever it settles, so callers (place search) can
+// rank results near what the user is looking at. Callback only — no re-render.
+function ViewReporter({ onChange }: { onChange?: (center: { lat: number; lng: number }) => void }) {
+  const map = useMapEvents({
+    moveend: () => {
+      const c = map.getCenter()
+      onChange?.({ lat: c.lat, lng: c.lng })
+    },
+  })
+  return null
+}
+
+const SEARCH_RESULT_ZOOM = 16
+
+// Flies to a searched place. Only reacts when `focus` changes, so ordinary
+// re-renders never yank the map back.
+function FlyToFocus({ focus }: { focus: { lat: number; lng: number } | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (focus) map.flyTo([focus.lat, focus.lng], SEARCH_RESULT_ZOOM)
+  }, [map, focus])
+  return null
+}
+
 // A real, fully interactive map used as hero backdrop — shows the visitor's
 // location (if granted) and nearby active rides at a glance. The header
 // (logo, sign-in) and the search card render in a layer above this map
@@ -157,6 +186,8 @@ export function HeroLiveMap({
   origin = null,
   destination = null,
   editing = null,
+  focus = null,
+  onViewChange,
   onEditConfirm,
   onEditCancel,
 }: HeroLiveMapProps) {
@@ -246,6 +277,8 @@ export function HeroLiveMap({
         <RecenterAndZoom center={center} zoom={zoom} />
         <CenterWatcher target={userLocation} onChange={setIsCentered} />
         <FitToPins points={pinPoints} suspended={editing !== null} />
+        <FlyToFocus focus={focus} />
+        <ViewReporter onChange={onViewChange} />
         <ZoomControl position="bottomleft" />
         <TileLayer attribution={MAP_TILE_ATTRIBUTION} url={MAP_TILE_URL} />
 

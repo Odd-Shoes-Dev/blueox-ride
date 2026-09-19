@@ -270,16 +270,16 @@ export default function PaymentPage() {
   return (
     <div className="min-h-screen bg-background pb-8">
       {/* Header */}
-      <div className="bg-navy-900 pt-12 pb-6 px-4">
+      <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
         <PageContainer>
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center text-white/80 hover:text-white mb-4"
+            className="flex items-center text-header-foreground/80 hover:text-header-foreground mb-4"
           >
             <ArrowLeft className="w-5 h-5 mr-1" />
             Back
           </button>
-          <h1 className="text-xl font-semibold text-white">Complete Payment</h1>
+          <h1 className="text-xl font-semibold text-header-foreground">Complete Payment</h1>
         </PageContainer>
       </div>
 

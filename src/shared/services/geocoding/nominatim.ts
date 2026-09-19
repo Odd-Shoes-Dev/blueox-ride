@@ -2,6 +2,8 @@
 // shared/services/geocoding should know the vendor is Nominatim — callers use
 // the normalized functions/types exported from ./index.ts.
 
+import type { PlaceSuggestion, SearchOptions } from './types'
+
 interface NominatimAddress {
   road?: string
   suburb?: string
@@ -17,44 +19,67 @@ interface NominatimResult {
   display_name: string
   lat: string
   lon: string
+  // The feature's own name — set for schools, churches, shops, roads, etc.
+  name?: string
+  class?: string
+  category?: string
+  type?: string
   address?: NominatimAddress
 }
 
-export interface PlaceSuggestion {
-  id: string
-  shortName: string
-  secondaryText: string
-  lat: number
-  lng: number
-}
+// Half-width, in degrees (~28 km), of the box used to bias results toward `near`.
+const NEAR_BIAS_DEGREES = 0.25
 
 function getShortName(result: NominatimResult): string {
   const parts: string[] = []
-  if (result.address) {
-    if (result.address.road) parts.push(result.address.road)
-    if (result.address.suburb) parts.push(result.address.suburb)
-    const city = result.address.city || result.address.town || result.address.village
+  const address = result.address
+  if (address) {
+    // A named feature (school, church, supermarket...) leads with its own name.
+    // Without this the label would show only the street it happens to sit on,
+    // so a search for "Kabalagala Primary School" would read as "Some Road, ...".
+    const featureName = result.name && result.name !== address.road ? result.name : undefined
+    if (featureName) parts.push(featureName)
+    else if (address.road) parts.push(address.road)
+    if (address.suburb) parts.push(address.suburb)
+    const city = address.city || address.town || address.village
     if (city) parts.push(city)
   }
-  return parts.length > 0 ? parts.join(', ') : result.display_name.split(',').slice(0, 2).join(',')
+  const unique = parts.filter((part, index) => parts.indexOf(part) === index)
+  return unique.length > 0 ? unique.join(', ') : result.display_name.split(',').slice(0, 2).join(',')
+}
+
+// e.g. "school" -> "School", "place_of_worship" -> "Place of worship"; every
+// kind of road collapses to "Road". Generic OSM values ("yes") are dropped.
+function getTypeLabel(result: NominatimResult): string {
+  if ((result.class || result.category) === 'highway') return 'Road'
+  const type = result.type
+  if (!type || type === 'yes') return ''
+  const label = type.replace(/_/g, ' ')
+  return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
 function getSecondaryText(result: NominatimResult): string {
   if (result.address) {
     const parts: string[] = []
+    const typeLabel = getTypeLabel(result)
+    if (typeLabel) parts.push(typeLabel)
     if (result.address.state) parts.push(result.address.state)
-    if (result.address.country) parts.push(result.address.country)
-    return parts.join(', ')
+    return parts.join(' · ')
   }
   return result.display_name.split(',').slice(2).join(',').trim()
 }
 
-export async function searchPlaces(query: string): Promise<PlaceSuggestion[]> {
+export async function searchPlaces(query: string, options?: SearchOptions): Promise<PlaceSuggestion[]> {
   if (!query || query.length < 3) return []
 
   const encodedQuery = encodeURIComponent(query)
+  // viewbox is left,top,right,bottom; without `bounded` it only *prefers* results inside it.
+  const near = options?.near
+  const viewbox = near
+    ? `&viewbox=${near.lng - NEAR_BIAS_DEGREES},${near.lat + NEAR_BIAS_DEGREES},${near.lng + NEAR_BIAS_DEGREES},${near.lat - NEAR_BIAS_DEGREES}`
+    : ''
   const response = await fetch(
-    `https://nominatim.openstreetmap.org/search?format=json&q=${encodedQuery}&countrycodes=ug&limit=5&addressdetails=1`,
+    `https://nominatim.openstreetmap.org/search?format=json&q=${encodedQuery}&countrycodes=ug&limit=8&addressdetails=1${viewbox}`,
     { headers: { 'Accept-Language': 'en' } }
   )
 

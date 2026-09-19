@@ -90,9 +90,9 @@ export default function SearchPage() {
       <SearchPageSEO />
       <div className="min-h-screen bg-background pb-24">
         {/* Header */}
-        <div className="bg-navy-900 pt-12 pb-6 px-4">
+        <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
           <PageContainer>
-            <h1 className="text-xl font-semibold text-white mb-4">Search Rides</h1>
+            <h1 className="text-xl font-semibold text-header-foreground mb-4">Search Rides</h1>
 
           {/* Main Search */}
           <div className="space-y-3">

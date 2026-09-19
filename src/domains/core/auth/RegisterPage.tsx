@@ -7,6 +7,7 @@ import { Label } from '@/shared/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card'
 import { RegisterPageSEO } from '@/shared/components/SEO'
 import { useToast } from '@/shared/hooks/use-toast'
+import { GoogleSignInButton } from '@/domains/core/auth/GoogleSignInButton'
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState('')
@@ -64,7 +65,7 @@ export default function RegisterPage() {
   return (
     <>
       <RegisterPageSEO />
-      <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-b from-navy-50 to-white">
+      <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-b from-navy-50 to-white dark:bg-none dark:bg-background">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <img
@@ -76,6 +77,8 @@ export default function RegisterPage() {
             <CardDescription>Join Blue OX Rides and start traveling together</CardDescription>
           </CardHeader>
         <CardContent>
+          <GoogleSignInButton />
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name</Label>
@@ -131,7 +134,9 @@ export default function RegisterPage() {
           </form>
 
           <p className="mt-4 text-xs text-center text-muted-foreground">
-            By signing up, you agree to our Terms of Service and Privacy Policy.
+            By signing up, you agree to our{' '}
+            <Link to="/terms" className="underline hover:text-foreground">Terms of Use</Link> and{' '}
+            <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.
           </p>
 
             <div className="mt-6 text-center text-sm">

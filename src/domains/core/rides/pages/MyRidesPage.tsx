@@ -294,9 +294,9 @@ export default function MyRidesPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-background pb-24">
-        <div className="bg-navy-900 pt-12 pb-6 px-4">
+        <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
           <PageContainer>
-            <h1 className="text-xl font-semibold text-white">My Rides</h1>
+            <h1 className="text-xl font-semibold text-header-foreground">My Rides</h1>
           </PageContainer>
         </div>
         <div className="px-4 mt-6">
@@ -316,9 +316,9 @@ export default function MyRidesPage() {
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
-      <div className="bg-navy-900 pt-12 pb-6 px-4">
+      <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
         <PageContainer>
-          <h1 className="text-xl font-semibold text-white">My Rides</h1>
+          <h1 className="text-xl font-semibold text-header-foreground">My Rides</h1>
         </PageContainer>
       </div>
 

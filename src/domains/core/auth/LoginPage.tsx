@@ -7,6 +7,7 @@ import { Label } from '@/shared/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card'
 import { LoginPageSEO } from '@/shared/components/SEO'
 import { useToast } from '@/shared/hooks/use-toast'
+import { GoogleSignInButton } from '@/domains/core/auth/GoogleSignInButton'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -50,7 +51,7 @@ export default function LoginPage() {
   return (
     <>
       <LoginPageSEO />
-      <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-b from-navy-50 to-white">
+      <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gradient-to-b from-navy-50 to-white dark:bg-none dark:bg-background">
         <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <img
@@ -62,6 +63,8 @@ export default function LoginPage() {
           <CardDescription>Sign in to your Blue OX Rides account</CardDescription>
         </CardHeader>
         <CardContent>
+          <GoogleSignInButton redirectPath={from} />
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -91,6 +94,12 @@ export default function LoginPage() {
               Sign In
             </Button>
           </form>
+
+          <p className="mt-4 text-xs text-center text-muted-foreground">
+            By continuing, you agree to our{' '}
+            <Link to="/terms" className="underline hover:text-foreground">Terms of Use</Link> and{' '}
+            <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.
+          </p>
 
           <div className="mt-6 text-center text-sm">
             <span className="text-muted-foreground">Don't have an account? </span>

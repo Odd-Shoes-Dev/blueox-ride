@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
+  signInWithGoogle: (redirectPath?: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
   updateProfile: (updates: Partial<User>) => Promise<{ error: Error | null }>
   refreshProfile: () => Promise<void>
@@ -163,6 +164,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return authRepository.signIn(email, password)
   }
 
+  const signInWithGoogle = async (redirectPath?: string) => {
+    return authRepository.signInWithGoogle(redirectPath)
+  }
+
   const signOut = async () => {
     await authRepository.signOut()
     setUser(null)
@@ -205,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     signUp,
     signIn,
+    signInWithGoogle,
     signOut,
     updateProfile,
     refreshProfile,

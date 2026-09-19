@@ -28,6 +28,18 @@ export async function signIn(email: string, password: string) {
   return { error: error as Error | null }
 }
 
+// Starts Google sign-in/sign-up (same call for both — Supabase creates the
+// account on first use). On success the browser leaves for Google and comes
+// back to `redirectPath`, where the session is picked up automatically; the
+// returned error only covers failures to *start* the flow.
+export async function signInWithGoogle(redirectPath = '/') {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: `${window.location.origin}${redirectPath}` },
+  })
+  return { error: error as Error | null }
+}
+
 export async function signOut() {
   await supabase.auth.signOut()
 }

@@ -24,8 +24,13 @@
     --input: 210 20% 88%;
     --ring: 0 100% 63%;
     --radius: 0.75rem;
+    /* Page header bars (the coloured strip with the title and back button).
+       One place to restyle every header: change these two values per theme. */
+    --header: 216 55% 21%;
+    --header-foreground: 0 0% 100%;
   }
 
+  /* Dark theme — opt-in only (the app defaults to light; see ThemeContext). */
   .dark {
     --background: 216 40% 11%;
     --foreground: 210 25% 96%;
@@ -46,6 +51,8 @@
     --border: 216 25% 24%;
     --input: 216 25% 24%;
     --ring: 0 100% 63%;
+    --header: 216 55% 21%;
+    --header-foreground: 0 0% 100%;
   }
 }
 

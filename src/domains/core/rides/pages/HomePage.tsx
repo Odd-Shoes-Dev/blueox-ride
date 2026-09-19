@@ -6,6 +6,7 @@ import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
 import { LocationPicker } from '@/domains/core/rides/components/LocationPicker'
 import { HeroLiveMap } from '@/domains/core/rides/components/HeroLiveMap'
+import { MapPlaceSearch } from '@/domains/core/rides/components/MapPlaceSearch'
 import type { PinKind } from '@/domains/core/rides/components/mapPins'
 import { HomePageSEO } from '@/shared/components/SEO'
 import { PageContainer } from '@/shared/components/PageContainer'
@@ -50,6 +51,12 @@ export default function HomePage({
   const [manualPickupOverride, setManualPickupOverride] = useState(false)
   // Which pin the user is currently placing on the hero map (null = none).
   const [editingPin, setEditingPin] = useState<PinKind | null>(null)
+  // Place search (top-right): just moves the map, never touches the trip fields.
+  const [placeSearchOpen, setPlaceSearchOpen] = useState(false)
+  const [mapFocus, setMapFocus] = useState<{ lat: number; lng: number } | null>(null)
+  // Latest map centre, used to rank place-search results near what's on screen.
+  // A ref (not state) — it changes on every pan and nothing needs to re-render.
+  const mapCenterRef = useRef<{ lat: number; lng: number } | null>(null)
   const [rides, setRides] = useState<RideWithDriver[]>([])
   const [openRequestCount, setOpenRequestCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -176,6 +183,11 @@ export default function HomePage({
     setLocatingUser(false)
   }
 
+  const handlePlaceSelect = (place: { lat: number; lng: number }) => {
+    setMapFocus({ lat: place.lat, lng: place.lng })
+    setPlaceSearchOpen(false)
+  }
+
   const handlePinConfirm = (kind: PinKind, point: Location) => {
     if (kind === 'pickup') setSearchOrigin(point)
     else setSearchDestination(point)
@@ -211,16 +223,21 @@ export default function HomePage({
           origin={usingAutoPickup ? null : searchOrigin}
           destination={searchDestination}
           editing={editingPin}
+          focus={mapFocus}
+          onViewChange={(center) => {
+            mapCenterRef.current = center
+          }}
           onEditConfirm={handlePinConfirm}
           onEditCancel={() => setEditingPin(null)}
         />
 
         {/* Top row: logo pill (left) + sign-in/avatar pill (right) */}
-        <div className="absolute top-4 inset-x-4 z-20 flex items-center justify-between pointer-events-none">
+        {/* z-30 (above the search card's z-20) so the place-search suggestions can overlap it. */}
+        <div className="absolute top-4 inset-x-4 z-30 flex items-center justify-between pointer-events-none">
           <Link
             to="/"
             aria-label="Blue OX Rides home"
-            className={`flex items-center gap-2 rounded-full pl-2 pr-4 py-2 hover:bg-white/90 transition-colors ${GLASS}`}
+            className={`flex items-center gap-2 rounded-full pl-2 pr-4 py-2 hover:bg-white/90 transition-colors ${GLASS} ${placeSearchOpen ? 'max-sm:hidden' : ''}`}
           >
             <img
               src="/assets/logo1.png"
@@ -229,25 +246,41 @@ export default function HomePage({
             />
             <span className="font-bold text-navy-900 text-sm">Blue OX Rides</span>
           </Link>
-          <div className="flex items-center gap-2">
-            <Link to="/search" aria-label="Search rides">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-navy-900 hover:bg-white/90 transition-colors ${GLASS}`}>
-                <Search className="w-5 h-5" />
-              </div>
-            </Link>
-            {user ? (
-              <Link to="/profile">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-navy-900 font-semibold ${GLASS}`}>
-                  {profile?.full_name?.[0]?.toUpperCase() || '?'}
-                </div>
-              </Link>
+          {/* Right cluster. Search is a place finder for the map only: it expands
+              into a field, and picking a result just moves the map there. On
+              phones the open field takes the whole row (logo/sign-in hide). */}
+          <div className={`flex items-center gap-2 ${placeSearchOpen ? 'flex-1 justify-end' : ''}`}>
+            {placeSearchOpen ? (
+              <MapPlaceSearch
+                onSelect={handlePlaceSelect}
+                onClose={() => setPlaceSearchOpen(false)}
+                getNearby={() => mapCenterRef.current}
+              />
             ) : (
-              <Link to="/login">
-                <div className={`px-4 py-2.5 rounded-full text-navy-900 text-sm font-medium hover:bg-white/80 transition-colors ${GLASS}`}>
-                  Sign In
-                </div>
-              </Link>
+              <button
+                type="button"
+                onClick={() => setPlaceSearchOpen(true)}
+                aria-label="Search places on the map"
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-navy-900 hover:bg-white/90 transition-colors ${GLASS}`}
+              >
+                <Search className="w-5 h-5" />
+              </button>
             )}
+            <div className={`flex-shrink-0 whitespace-nowrap ${placeSearchOpen ? 'max-sm:hidden' : ''}`}>
+              {user ? (
+                <Link to="/profile">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-navy-900 font-semibold ${GLASS}`}>
+                    {profile?.full_name?.[0]?.toUpperCase() || '?'}
+                  </div>
+                </Link>
+              ) : (
+                <Link to="/login">
+                  <div className={`px-4 py-2.5 rounded-full text-navy-900 text-sm font-medium hover:bg-white/80 transition-colors ${GLASS}`}>
+                    Sign In
+                  </div>
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 
@@ -688,6 +721,13 @@ export default function HomePage({
           </PageContainer>
         </div>
       )}
+
+      {/* Legal links */}
+      <footer className="px-4 mt-10 pb-2 text-center text-xs text-muted-foreground">
+        <Link to="/terms" className="hover:text-foreground hover:underline">Terms of Use</Link>
+        {' · '}
+        <Link to="/privacy" className="hover:text-foreground hover:underline">Privacy Policy</Link>
+      </footer>
       </div>
     </>
   )
