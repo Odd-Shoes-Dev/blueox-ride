@@ -17,11 +17,13 @@ import { Card, CardContent } from '@/shared/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/dialog'
 import { useOptionalMapShell, type PreviewableRide } from '@/domains/core/rides/map/MapShellContext'
+import { usePayments } from '@/shared/contexts/AppSettingsContext'
+import { useBookingRequests } from '@/domains/core/rides/requests/BookingRequestsContext'
 import { useToast } from '@/shared/hooks/use-toast'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { ReviewDialog } from '@/domains/core/rides/components/ReviewDialog'
 import { formatCurrency, formatDate } from '@/shared/lib/utils'
-import { Calendar, Users, Plus, X, Phone, MessageCircle, Wallet, Star, CheckCircle, ArrowRight } from 'lucide-react'
+import { Calendar, Users, Plus, X, Phone, MessageCircle, Wallet, Star, CheckCircle, ArrowRight, Check, Minus } from 'lucide-react'
 import type { RideRequest } from '@/shared/types'
 
 type RideWithBookings = ridesRepository.RideWithBookings
@@ -32,6 +34,10 @@ export default function MyRidesPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const shell = useOptionalMapShell()
+  // Payments off = bookings are free, so there is never anything to refund.
+  const { paymentsEnabled } = usePayments()
+  // Riders asking this driver for a seat (with their own stops / offer), waiting for an answer
+  const { pendingCount: waitingRequests } = useBookingRequests()
 
   // Tapping a card (but not the buttons/links inside it) shows that ride's route on
   // the map behind the panel; tapping it again hides it.
@@ -47,7 +53,7 @@ export default function MyRidesPage() {
   const [myBookings, setMyBookings] = useState<BookingWithRide[]>([])
   const [myRequests, setMyRequests] = useState<RideRequest[]>([])
   const [loading, setLoading] = useState(true)
-  const [cancelDialog, setCancelDialog] = useState<{ type: 'ride' | 'booking' | 'request'; id: string } | null>(null)
+  const [cancelDialog, setCancelDialog] = useState<{ type: 'ride' | 'booking' | 'request' | 'noshow'; id: string } | null>(null)
   const [canceling, setCanceling] = useState(false)
   const [reviewedBookingIds, setReviewedBookingIds] = useState<Set<string>>(new Set())
   const [reviewTarget, setReviewTarget] = useState<{ bookingId: string; revieweeId: string; revieweeName: string } | null>(null)
@@ -130,8 +136,69 @@ export default function MyRidesPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]) // Only re-fetch when user ID changes
 
+  // --- Driver's seat controls ---
+  const handleAdjustSeats = async (rideId: string, delta: number) => {
+    try {
+      await ridesRepository.adjustSeats(rideId, delta)
+      shell?.refreshMyRides()
+      await fetchData()
+    } catch (error) {
+      toast({
+        title: 'Could not change the seats',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleTogglePickedUp = async (bookingId: string, pickedUp: boolean) => {
+    try {
+      await bookingsRepository.setPickedUp(bookingId, pickedUp)
+      await fetchData()
+    } catch (error) {
+      toast({
+        title: 'Could not update',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleNoShow = async (bookingId: string) => {
+    setCanceling(true)
+    try {
+      await bookingsRepository.markNoShow(bookingId)
+      toast({
+        title: 'Marked as a no-show',
+        description: 'Their seat is free again.',
+        variant: 'success',
+      })
+      shell?.refreshMyRides()
+      await fetchData()
+    } catch (error) {
+      toast({
+        title: 'Could not mark a no-show',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      })
+    }
+    setCanceling(false)
+    setCancelDialog(null)
+  }
+
   const handleCancelRide = async (rideId: string) => {
     setCanceling(true)
+
+    // Free bookings (no fee paid) have nothing to refund, but they still have to be cancelled.
+    // Do that BEFORE cancelling the ride: cancelling a confirmed booking gives its seats back
+    // and would otherwise reopen the ride the driver is cancelling.
+    const rideToCancel = myRides.find((r) => r.id === rideId)
+    const freeBookings = (rideToCancel?.bookings ?? []).filter(
+      (b) => b.booking_fee === 0 && (b.status === 'confirmed' || b.status === 'pending_payment')
+    )
+    for (const freeBooking of freeBookings) {
+      await bookingsRepository.cancelBooking(freeBooking.id, 'driver')
+    }
 
     // Cancel the ride
     const { error } = await ridesRepository.cancelRide(rideId)
@@ -146,17 +213,21 @@ export default function MyRidesPage() {
       // Refund all confirmed bookings
       const ride = myRides.find(r => r.id === rideId)
       const confirmedBookings = ride?.bookings.filter(b => b.status === 'confirmed') || []
+      // Only bookings that actually paid a fee have a refund to send.
+      const paidBookings = confirmedBookings.filter(b => b.booking_fee > 0)
 
-      for (const booking of confirmedBookings) {
+      for (const booking of paidBookings) {
         // Trigger refund via edge function
         await paymentsRepository.requestRefund(booking.id, 'driver')
       }
 
       toast({
         title: 'Ride cancelled',
-        description: confirmedBookings.length > 0
+        description: paidBookings.length > 0
           ? 'Passengers will be refunded.'
-          : 'Your ride has been cancelled.',
+          : confirmedBookings.length > 0
+            ? 'Your passengers will see that the ride is cancelled.'
+            : 'Your ride has been cancelled.',
         variant: 'success',
       })
       shell?.refreshMyRides()
@@ -172,7 +243,9 @@ export default function MyRidesPage() {
 
     const booking = myBookings.find(b => b.id === bookingId)
 
-    if (booking?.status === 'confirmed') {
+    // A booking with no fee paid (free) has nothing to refund: just cancel it, and the seats
+    // go back on the ride. Only bookings that actually paid a fee go through the refund process.
+    if (booking?.status === 'confirmed' && (paymentsEnabled || booking.booking_fee > 0)) {
       // Trigger refund via edge function
       let data: { success: boolean; error?: string; message?: string } | undefined
       let error: Error | undefined
@@ -260,7 +333,7 @@ export default function MyRidesPage() {
     setCompletingRideId(null)
   }
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, noShow = false) => {
     const styles: Record<string, string> = {
       active: 'bg-green-100 text-green-800',
       full: 'bg-blue-100 text-blue-800',
@@ -291,7 +364,7 @@ export default function MyRidesPage() {
 
     return (
       <span className={`text-xs px-2 py-1 rounded-full font-medium ${styles[status] || 'bg-gray-100 text-gray-800'}`}>
-        {labels[status] || status}
+        {status === 'cancelled_by_driver' && noShow ? 'No-show' : labels[status] || status}
       </span>
     )
   }
@@ -337,6 +410,20 @@ export default function MyRidesPage() {
 
       <div className="px-4 mt-6">
         <PageContainer size="wide">
+          {/* Booking requests: riders asking for a seat with their own stops or offer */}
+          <Card className={waitingRequests > 0 ? 'border-primary mb-4' : 'mb-4'}>
+            <CardContent className="p-3 flex items-center justify-between gap-3">
+              <p className="text-sm">
+                {waitingRequests > 0
+                  ? `${waitingRequests} booking request${waitingRequests > 1 ? 's' : ''} waiting for your answer`
+                  : 'Booking requests'}
+              </p>
+              <Button asChild size="sm" variant={waitingRequests > 0 ? 'default' : 'outline'}>
+                <Link to="/booking-requests">Open</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full">
               <TabsTrigger value="bookings" className="flex-1">
@@ -375,7 +462,7 @@ export default function MyRidesPage() {
                             <span className="text-sm font-medium">{booking.ride.destination_name}</span>
                           </div>
                         </div>
-                        {getStatusBadge(booking.status)}
+                        {getStatusBadge(booking.status, booking.no_show)}
                       </div>
 
                       <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
@@ -420,9 +507,11 @@ export default function MyRidesPage() {
                         {booking.status === 'pending_payment' && (
                           <Button
                             className="flex-1"
-                            onClick={() => navigate(`/bookings/${booking.id}/pay`)}
+                            onClick={() =>
+                              paymentsEnabled ? navigate(`/bookings/${booking.id}/pay`) : navigate(`/rides/${booking.ride.id}`)
+                            }
                           >
-                            Complete Payment
+                            {paymentsEnabled ? 'Complete Payment' : 'Confirm my seat'}
                           </Button>
                         )}
 
@@ -550,7 +639,7 @@ export default function MyRidesPage() {
                         )}
                       </div>
 
-                      {request.status === 'matched' && request.matched_booking_id && (
+                      {request.status === 'matched' && request.matched_booking_id && paymentsEnabled && (
                         <Button
                           className="w-full mt-3"
                           size="sm"
@@ -613,9 +702,46 @@ export default function MyRidesPage() {
                         </span>
                         <span className="flex items-center gap-1">
                           <Users className="w-4 h-4" />
-                          {ride.total_seats - ride.available_seats}/{ride.total_seats} booked
+                          {ride.total_seats - ride.available_seats}/{ride.total_seats} seats taken
                         </span>
                       </div>
+
+                      {/* Keep the seat count true: tap − when someone gets in on the road, + when a seat frees up */}
+                      {(ride.status === 'active' || ride.status === 'full') && (
+                        <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-muted px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">Seats left</p>
+                            <p className="text-xs text-muted-foreground">Picked someone up on the road? Tap −</p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="outline"
+                              className="h-9 w-9"
+                              disabled={ride.available_seats <= 0}
+                              onClick={() => handleAdjustSeats(ride.id, -1)}
+                              aria-label="One fewer seat left"
+                            >
+                              <Minus className="w-4 h-4" />
+                            </Button>
+                            <span className="w-12 text-center font-semibold">
+                              {ride.available_seats}/{ride.total_seats}
+                            </span>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="outline"
+                              className="h-9 w-9"
+                              disabled={ride.available_seats >= ride.total_seats}
+                              onClick={() => handleAdjustSeats(ride.id, 1)}
+                              aria-label="One more seat left"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                       <Button asChild variant="outline" size="sm" className="w-full mt-3">
                         <Link to={`/rides/${ride.id}`}>
                           Open details
@@ -626,7 +752,14 @@ export default function MyRidesPage() {
                       {/* Passengers */}
                       {ride.bookings.filter(b => b.status === 'confirmed').length > 0 && (
                         <div className="mt-4 pt-4 border-t">
-                          <p className="text-sm font-medium mb-2">Passengers</p>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm font-medium">Passengers</p>
+                            <p className="text-xs text-muted-foreground">
+                              {ride.bookings.filter(b => b.status === 'confirmed' && b.picked_up_at).reduce((sum, b) => sum + b.seats_booked, 0)}
+                              {' of '}
+                              {ride.bookings.filter(b => b.status === 'confirmed').reduce((sum, b) => sum + b.seats_booked, 0)} in the car
+                            </p>
+                          </div>
                           <div className="space-y-2">
                             {ride.bookings
                               .filter(b => b.status === 'confirmed')
@@ -641,15 +774,47 @@ export default function MyRidesPage() {
                                       <p className="text-xs text-muted-foreground">
                                         {booking.seats_booked} seat(s)
                                       </p>
+                                      {(booking.pickup_name || booking.dropoff_name) && (
+                                        <p className="text-xs text-muted-foreground">
+                                          Gets in: {booking.pickup_name ?? ride.origin_name} · off: {booking.dropoff_name ?? ride.destination_name}
+                                        </p>
+                                      )}
+                                      {booking.agreed_price != null && booking.agreed_price !== ride.price && (
+                                        <p className="text-xs text-muted-foreground">
+                                          Agreed {formatCurrency(booking.agreed_price)}/seat
+                                        </p>
+                                      )}
                                     </div>
                                   </div>
-                                  {booking.passenger.phone_number && (
-                                    <a href={`tel:${booking.passenger.phone_number}`}>
-                                      <Button variant="ghost" size="sm">
-                                        <Phone className="w-4 h-4" />
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      type="button"
+                                      variant={booking.picked_up_at ? 'default' : 'outline'}
+                                      size="sm"
+                                      onClick={() => handleTogglePickedUp(booking.id, !booking.picked_up_at)}
+                                    >
+                                      <Check className="w-4 h-4 mr-1" />
+                                      {booking.picked_up_at ? 'In the car' : 'Picked up'}
+                                    </Button>
+                                    {!booking.picked_up_at && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-muted-foreground"
+                                        onClick={() => setCancelDialog({ type: 'noshow', id: booking.id })}
+                                      >
+                                        No-show
                                       </Button>
-                                    </a>
-                                  )}
+                                    )}
+                                    {booking.passenger.phone_number && (
+                                      <a href={`tel:${booking.passenger.phone_number}`}>
+                                        <Button variant="ghost" size="sm" aria-label="Call">
+                                          <Phone className="w-4 h-4" />
+                                        </Button>
+                                      </a>
+                                    )}
+                                  </div>
                                 </div>
                               ))}
                           </div>
@@ -737,19 +902,27 @@ export default function MyRidesPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Cancel {cancelDialog?.type === 'ride' ? 'Ride' : cancelDialog?.type === 'request' ? 'Request' : 'Booking'}?
+              {cancelDialog?.type === 'noshow'
+                ? 'Mark as a no-show?'
+                : `Cancel ${cancelDialog?.type === 'ride' ? 'Ride' : cancelDialog?.type === 'request' ? 'Request' : 'Booking'}?`}
             </DialogTitle>
             <DialogDescription>
-              {cancelDialog?.type === 'ride'
-                ? 'All confirmed passengers will be refunded their booking fees.'
+              {cancelDialog?.type === 'noshow'
+                ? "This passenger didn't turn up. Their booking is cancelled and their seat goes back on the ride so someone else can take it."
+                : cancelDialog?.type === 'ride'
+                ? paymentsEnabled
+                  ? 'All confirmed passengers will be refunded their booking fees.'
+                  : 'Passengers who booked this ride will see that it is cancelled.'
                 : cancelDialog?.type === 'request'
                 ? 'Drivers will no longer be able to accept this request.'
-                : 'Refund policy: Cancel more than 1 hour before departure for a full refund. Cancellations within 1 hour forfeit the booking fee to the driver.'}
+                : paymentsEnabled
+                  ? 'Refund policy: Cancel more than 1 hour before departure for a full refund. Cancellations within 1 hour forfeit the booking fee to the driver.'
+                  : 'Your seat goes back to the driver so someone else can take it. Please let the driver know you can\'t make it.'}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCancelDialog(null)}>
-              Keep {cancelDialog?.type === 'ride' ? 'Ride' : cancelDialog?.type === 'request' ? 'Request' : 'Booking'}
+              {cancelDialog?.type === 'noshow' ? 'Not yet' : `Keep ${cancelDialog?.type === 'ride' ? 'Ride' : cancelDialog?.type === 'request' ? 'Request' : 'Booking'}`}
             </Button>
             <Button
               variant="destructive"
@@ -759,12 +932,14 @@ export default function MyRidesPage() {
                   handleCancelRide(cancelDialog.id)
                 } else if (cancelDialog?.type === 'request') {
                   handleCancelRequest(cancelDialog.id)
+                } else if (cancelDialog?.type === 'noshow') {
+                  handleNoShow(cancelDialog.id)
                 } else if (cancelDialog) {
                   handleCancelBooking(cancelDialog.id)
                 }
               }}
             >
-              Cancel {cancelDialog?.type === 'ride' ? 'Ride' : cancelDialog?.type === 'request' ? 'Request' : 'Booking'}
+              {cancelDialog?.type === 'noshow' ? 'Mark no-show' : `Cancel ${cancelDialog?.type === 'ride' ? 'Ride' : cancelDialog?.type === 'request' ? 'Request' : 'Booking'}`}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -12,6 +12,10 @@ export type PaymentType = 'booking_fee' | 'refund_to_passenger' | 'refund_to_dri
 
 export type CommissionStatus = 'pending' | 'paid'
 
+// A passenger's request for a seat on a driver's ride (own pickup/drop-off and offer)
+export type BookingRequestStatus = 'pending' | 'accepted' | 'declined' | 'withdrawn' | 'expired'
+export type DeclineReason = 'offer_too_low' | 'pickup_too_far' | 'seats_reserved' | 'other'
+
 export type RideRequestStatus = 'open' | 'matched' | 'cancelled' | 'expired'
 
 export interface User {
@@ -78,6 +82,33 @@ export interface Church {
   updated_at: string
 }
 
+export interface BookingRequest {
+  id: string
+  ride_id: string
+  ride?: Ride
+  driver_id: string
+  passenger_id: string
+  passenger?: User
+  seats: number
+  // What the passenger offers per seat, in UGX
+  offer_price: number
+  pickup_name: string | null
+  pickup_lat: number | null
+  pickup_lng: number | null
+  dropoff_name: string | null
+  dropoff_lat: number | null
+  dropoff_lng: number | null
+  status: BookingRequestStatus
+  decline_reason: DeclineReason | null
+  // The driver asked not to get more requests from this person on this ride
+  blocked: boolean
+  attempt_no: number
+  booking_id: string | null
+  created_at: string
+  responded_at: string | null
+  expires_at: string
+}
+
 export interface Booking {
   id: string
   ride_id: string
@@ -87,6 +118,19 @@ export interface Booking {
   seats_booked: number
   booking_fee: number
   status: BookingStatus
+  // Set by the driver when the passenger gets in; a no-show is a booking the driver cancelled
+  // because the passenger never turned up.
+  picked_up_at?: string | null
+  no_show?: boolean
+  // Where they get in / off, when not the ride's own start and end (set for accepted requests)
+  pickup_name?: string | null
+  pickup_lat?: number | null
+  pickup_lng?: number | null
+  dropoff_name?: string | null
+  dropoff_lat?: number | null
+  dropoff_lng?: number | null
+  // Price per seat that was agreed; null = the ride's listed price
+  agreed_price?: number | null
   church_id: string | null
   church?: Church
   created_at: string

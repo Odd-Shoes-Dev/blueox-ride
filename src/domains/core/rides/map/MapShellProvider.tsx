@@ -113,6 +113,43 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
     [beginWatching]
   )
 
+  // Seats left on the ride being driven, kept fresh (other people may book meanwhile) and
+  // adjustable by the driver from the trip bar.
+  const [seatsState, setSeatsState] = useState<{ rideId: string; available: number; total: number } | null>(null)
+  const drivingRideId = live.liveTrip?.role === 'driver' ? live.liveTrip.ride.id : null
+
+  useEffect(() => {
+    if (!drivingRideId) return
+    let cancelled = false
+    const load = () =>
+      ridesRepository
+        .getRideWithDriver(drivingRideId)
+        .then((ride) => {
+          if (!cancelled && ride) {
+            setSeatsState({ rideId: drivingRideId, available: ride.available_seats, total: ride.total_seats })
+          }
+        })
+        .catch((err) => console.error('Could not load seats:', err))
+    load()
+    const id = setInterval(load, 30_000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [drivingRideId])
+
+  const tripSeats = seatsState && seatsState.rideId === drivingRideId ? seatsState : null
+
+  const adjustTripSeats = useCallback(
+    async (delta: number) => {
+      if (!drivingRideId) return
+      const available = await ridesRepository.adjustSeats(drivingRideId, delta)
+      setSeatsState((prev) => (prev && prev.rideId === drivingRideId ? { ...prev, available } : prev))
+      refreshMyRides()
+    },
+    [drivingRideId, refreshMyRides]
+  )
+
   // Featured ride: the previewed/tapped one, otherwise the driver's own next ride.
   const featuredRide = useMemo<PreviewableRide | null>(() => {
     // A tapped pin can belong to the search results, which are not always in the general list.
@@ -356,6 +393,8 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
       livePosition: live.livePosition,
       liveError: live.liveError,
       tripRoute,
+      tripSeats,
+      adjustTripSeats,
       startDriverTrip,
       watchDriver,
       stopLiveTrip: live.stopLiveTrip,
@@ -400,6 +439,8 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
       live.liveError,
       live.stopLiveTrip,
       tripRoute,
+      tripSeats,
+      adjustTripSeats,
       startDriverTrip,
       watchDriver,
       focus,

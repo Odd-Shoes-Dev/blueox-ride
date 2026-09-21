@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { LEGAL } from '@/domains/core/legal/legalConfig'
+import { usePayments } from '@/shared/contexts/AppSettingsContext'
 import {
   LegalLayout,
   LegalList,
@@ -7,6 +8,107 @@ import {
   SupportEmail,
   type LegalSection,
 } from '@/domains/core/legal/LegalLayout'
+
+// While payments are switched off (see the app setting), the Service is free and nothing is
+// paid through it; the text below follows that setting so it always matches what the app does.
+function FeesContent() {
+  const { paymentsEnabled } = usePayments()
+
+  if (!paymentsEnabled) {
+    return (
+      <>
+        <LegalList>
+          <li>
+            Booking a seat is <strong>free</strong>. We don't charge passengers or drivers a booking fee, and we don't
+            process payments through the Service.
+          </li>
+          <li>
+            The price on a ride is set by the driver. You pay the driver <strong>directly, in cash,</strong> after the
+            ride. Any agreement about payment is between you and the driver.
+          </li>
+          <li>All prices are in Ugandan shillings (UGX).</li>
+          <li>A booking is confirmed as soon as you make it, as long as seats are still available.</li>
+        </LegalList>
+        <p>
+          We may introduce fees in future. If we do, we will tell you in the Service and update these Terms before they
+          apply, and they will not apply to bookings made before then.
+        </p>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <LegalList>
+        <li>
+          To reserve a seat you pay a booking fee of {LEGAL.bookingFeePercent}% of the ride price per seat, online
+          through mobile money. The amount is shown before you pay.
+        </li>
+        <li>You pay the remaining {100 - LEGAL.bookingFeePercent}% directly to the driver in cash after the ride.</li>
+        <li>All prices are in Ugandan shillings (UGX).</li>
+        <li>
+          Online payments are handled by our payment provider, Pesapal, and your mobile money operator, and are also
+          subject to their terms. Their charges, if any, are theirs.
+        </li>
+        <li>A booking is confirmed only once the booking fee has been paid successfully.</li>
+      </LegalList>
+      <p>
+        A portion of the booking fee may be shared with a partner church if you arrived through that church's page.
+        This does not change what you pay.
+      </p>
+    </>
+  )
+}
+
+function CancellationsContent() {
+  const { paymentsEnabled } = usePayments()
+
+  if (!paymentsEnabled) {
+    return (
+      <>
+        <p>Because nothing is paid through the Service, there are no refunds to process.</p>
+        <LegalList>
+          <li>
+            <strong>Passengers</strong> can cancel a booking from My Rides. Please do it as early as you can, and tell
+            the driver, so the seat can go to someone else.
+          </li>
+          <li>
+            <strong>Drivers</strong> can cancel a ride from My Rides. Passengers who booked will see that it has been
+            cancelled; please also contact them directly if you can.
+          </li>
+        </LegalList>
+        <p>
+          Repeatedly booking and not showing up, or cancelling at the last minute, can lead us to limit an account (see
+          "Suspension and ending your account"). If a driver does not show up, or something else goes wrong, contact us at{' '}
+          <SupportEmail />.
+        </p>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <LegalList>
+        <li>
+          <strong>Passenger cancels more than {LEGAL.freeCancellationHours} hour before departure:</strong> your
+          booking fee is refunded to you.
+        </li>
+        <li>
+          <strong>Passenger cancels {LEGAL.freeCancellationHours} hour or less before departure:</strong> the booking
+          fee is not refunded to you and goes to the driver, to compensate for the lost seat.
+        </li>
+        <li>
+          <strong>Driver cancels a ride:</strong> every confirmed passenger's booking fee is refunded.
+        </li>
+      </LegalList>
+      <p>
+        Refunds are sent back through the same payment provider and can take time to reach you. Cash paid to a driver
+        is between you and the driver. If a driver does not show up, or something else goes wrong, contact us at{' '}
+        <SupportEmail /> and we will help where we can.
+      </p>
+    </>
+  )
+}
 
 const sections: LegalSection[] = [
   {
@@ -84,8 +186,7 @@ const sections: LegalSection[] = [
           <li>you will only cancel a ride when you have to, and will do so as early as you can.</li>
         </LegalList>
         <p>
-          You set your own price per seat. You collect the balance (see "Booking fee, payment and cash") directly from
-          passengers.
+          You set your own price per seat. You collect what passengers owe you directly from them (see "Fees and payment").
         </p>
       </>
     ),
@@ -103,61 +204,24 @@ const sections: LegalSection[] = [
           it, which creates a booking for you. Any negotiation beyond that happens between you and the driver, outside
           the Service, and we are not a party to it.
         </li>
+        <li>
+          <strong>Booking requests:</strong> instead of booking instantly, you can ask a driver for a seat with your own
+          pickup, drop-off and offer. The driver may accept or refuse. You can send up to 3 requests on the same ride,
+          and each new request after a refusal must change something (your offer, seats, or stops). A driver may also
+          stop further requests from someone on their ride.
+        </li>
       </LegalList>
     ),
   },
   {
     id: 'fees',
-    title: 'Booking fee, payment and cash',
-    content: (
-      <>
-        <LegalList>
-          <li>
-            To reserve a seat you pay a booking fee of {LEGAL.bookingFeePercent}% of the ride price per seat, online
-            through mobile money. The amount is shown before you pay.
-          </li>
-          <li>
-            You pay the remaining {100 - LEGAL.bookingFeePercent}% directly to the driver in cash after the ride.
-          </li>
-          <li>All prices are in Ugandan shillings (UGX).</li>
-          <li>
-            Online payments are handled by our payment provider, Pesapal, and your mobile money operator, and are also
-            subject to their terms. Their charges, if any, are theirs.
-          </li>
-          <li>A booking is confirmed only once the booking fee has been paid successfully.</li>
-        </LegalList>
-        <p>
-          A portion of the booking fee may be shared with a partner church if you arrived through that church's page.
-          This does not change what you pay.
-        </p>
-      </>
-    ),
+    title: 'Fees and payment',
+    content: <FeesContent />,
   },
   {
     id: 'cancellations',
     title: 'Cancellations and refunds',
-    content: (
-      <>
-        <LegalList>
-          <li>
-            <strong>Passenger cancels more than {LEGAL.freeCancellationHours} hour before departure:</strong> your
-            booking fee is refunded to you.
-          </li>
-          <li>
-            <strong>Passenger cancels {LEGAL.freeCancellationHours} hour or less before departure:</strong> the
-            booking fee is not refunded to you and goes to the driver, to compensate for the lost seat.
-          </li>
-          <li>
-            <strong>Driver cancels a ride:</strong> every confirmed passenger's booking fee is refunded.
-          </li>
-        </LegalList>
-        <p>
-          Refunds are sent back through the same payment provider and can take time to reach you. Cash paid to a
-          driver is between you and the driver. If a driver does not show up, or something else goes wrong, contact
-          us at <SupportEmail /> and we will help where we can.
-        </p>
-      </>
-    ),
+    content: <CancellationsContent />,
   },
   {
     id: 'safety',
@@ -261,8 +325,8 @@ const sections: LegalSection[] = [
             we are not liable for indirect or consequential loss, or for loss of profit, income or opportunity;
           </li>
           <li>
-            our total liability to you for any claim connected to the Service is limited to the booking fees you paid
-            to us in the 12 months before the claim arose.
+            our total liability to you for any claim connected to the Service is limited to the amounts you paid to
+            us in the 12 months before the claim arose (which may be nothing, while the Service is free).
           </li>
         </LegalList>
         <p>
@@ -339,24 +403,40 @@ const sections: LegalSection[] = [
 ]
 
 export default function TermsPage() {
+  const { paymentsEnabled } = usePayments()
+
   return (
     <LegalLayout
       title="Terms of Use"
       path="/terms"
       seoDescription="The terms that apply when you use Blue OX Rides to offer or book shared rides in Uganda, including fees, cancellations and safety."
       summary={
-        <>
-          <p>
-            Blue OX Rides connects drivers and passengers — we are not a transport company, and drivers are independent.
-            You pay a {LEGAL.bookingFeePercent}% booking fee online to reserve a seat and the rest in cash to the
-            driver.
-          </p>
-          <p>
-            Cancel more than {LEGAL.freeCancellationHours} hour ahead for a refund of your fee; drivers who cancel
-            refund everyone. Be honest, be respectful, and use your judgement on safety — drivers must hold every
-            licence and insurance the law requires.
-          </p>
-        </>
+        paymentsEnabled ? (
+          <>
+            <p>
+              Blue OX Rides connects drivers and passengers — we are not a transport company, and drivers are
+              independent. You pay a {LEGAL.bookingFeePercent}% booking fee online to reserve a seat and the rest in cash
+              to the driver.
+            </p>
+            <p>
+              Cancel more than {LEGAL.freeCancellationHours} hour ahead for a refund of your fee; drivers who cancel
+              refund everyone. Be honest, be respectful, and use your judgement on safety — drivers must hold every
+              licence and insurance the law requires.
+            </p>
+          </>
+        ) : (
+          <>
+            <p>
+              Blue OX Rides connects drivers and passengers — we are not a transport company, and drivers are
+              independent. Booking is currently <strong>free</strong>: there is no booking fee, and you pay the driver
+              the ride price directly in cash.
+            </p>
+            <p>
+              Please cancel early if your plans change. Be honest, be respectful, and use your judgement on safety —
+              drivers must hold every licence and insurance the law requires.
+            </p>
+          </>
+        )
       }
       sections={sections}
       related={{ to: '/privacy', label: 'Read our Privacy Policy' }}

@@ -86,6 +86,17 @@ serve(async (req) => {
       throw new Error('Unauthorized')
     }
 
+    // Payments are switched off (app_settings.payments_enabled = false): never start a charge,
+    // whatever a client asks for.
+    const { data: paymentsSetting } = await supabaseAdmin
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'payments_enabled')
+      .maybeSingle()
+    if (paymentsSetting?.value !== true) {
+      throw new Error('Payments are not enabled right now')
+    }
+
     const { booking_id, phone_number }: PaymentRequest = await req.json()
 
     if (!booking_id || !phone_number) {

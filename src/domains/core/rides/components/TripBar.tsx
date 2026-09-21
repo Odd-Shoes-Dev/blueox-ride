@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Flag, Loader2, X } from 'lucide-react'
+import { AlertTriangle, Flag, Loader2, Minus, Plus, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { cn } from '@/shared/lib/utils'
 import { formatDistance, formatDuration } from '@/domains/core/rides/hooks/useRideRouteOnMap'
@@ -11,6 +11,9 @@ interface TripBarProps {
   position: LivePosition | null
   route: { points: [number, number][]; summary: { distanceKm: number; durationMin: number } | null } | null
   error: string | null
+  // Driver only: seats left, and a way to change them
+  seats?: { available: number; total: number } | null
+  onAdjustSeats?: (delta: number) => Promise<void>
   onStop: () => void
   className?: string
 }
@@ -33,8 +36,22 @@ function useNow(intervalMs: number): number {
 // Live status for a trip on the map: how far is left, roughly how long, and whether
 // the vehicle is off the planned route. Drivers get an "End trip" button; passengers
 // can stop following. Sits over the map so it's visible with every panel closed.
-export function TripBar({ trip, position, route, error, onStop, className }: TripBarProps) {
+export function TripBar({ trip, position, route, error, seats, onAdjustSeats, onStop, className }: TripBarProps) {
   const isDriver = trip.role === 'driver'
+  const [seatBusy, setSeatBusy] = useState(false)
+  const [seatError, setSeatError] = useState<string | null>(null)
+
+  const changeSeats = async (delta: number) => {
+    if (!onAdjustSeats) return
+    setSeatBusy(true)
+    setSeatError(null)
+    try {
+      await onAdjustSeats(delta)
+    } catch (err) {
+      setSeatError(err instanceof Error ? err.message : 'Could not change the seats')
+    }
+    setSeatBusy(false)
+  }
   const now = useNow(15_000)
   const destination = trip.ride.destination_name
 
@@ -131,6 +148,44 @@ export function TripBar({ trip, position, route, error, onStop, className }: Tri
         </p>
       )}
       {error && <p className="mt-1 text-xs text-amber-700">{error}</p>}
+
+      {/* The driver keeps the seat count true: tap − when someone gets in on the road */}
+      {isDriver && seats && (
+        <div className="mt-2 pt-2 border-t border-navy-900/10 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-navy-900/80">Seats left</p>
+            <p className="text-[11px] text-navy-900/50">Picked someone up on the road? Tap −</p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-8 w-8 bg-white text-navy-900 border-navy-200"
+              disabled={seatBusy || seats.available <= 0}
+              onClick={() => changeSeats(-1)}
+              aria-label="One fewer seat left"
+            >
+              <Minus className="w-4 h-4" />
+            </Button>
+            <span className="w-12 text-center font-semibold">
+              {seats.available}/{seats.total}
+            </span>
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-8 w-8 bg-white text-navy-900 border-navy-200"
+              disabled={seatBusy || seats.available >= seats.total}
+              onClick={() => changeSeats(1)}
+              aria-label="One more seat left"
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+      {seatError && <p className="mt-1 text-xs text-red-700">{seatError}</p>}
     </div>
   )
 }

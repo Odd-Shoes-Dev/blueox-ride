@@ -19,7 +19,7 @@ BlueOx Rides is a carpooling platform serving Uganda. We connect drivers who hav
 ### For Passengers
 - Search for rides by origin and destination
 - View driver profiles, ratings, and vehicle details
-- Book seats securely with mobile money payment
+- Book seats for free and pay the driver in cash after the ride
 - Track ride routes on interactive maps
 - Find rides "along the way" even if destinations differ slightly
 
@@ -50,14 +50,13 @@ Common carpooling routes in Uganda include:
 - Ride prices are set by individual drivers
 - Typical range: UGX 5,000 to UGX 100,000 depending on distance
 - Generally 30-50% cheaper than traditional transport
-- Payment via mobile money (MTN, Airtel)
+- Free booking; passengers pay the driver in cash
 
 ## Safety
 
 - All drivers verified with ID and vehicle details
 - Driver ratings and reviews visible
 - Trip details can be shared with family/friends
-- Secure payment processing
 
 ## How to Use
 
@@ -65,7 +64,7 @@ Common carpooling routes in Uganda include:
 2. Enter your pickup location and destination
 3. Browse available rides with prices and times
 4. Select a ride and book your seat(s)
-5. Pay securely via mobile money
+5. Pay the driver in cash after the ride
 6. Meet your driver at the pickup point
 
 ## Contact

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { ridesRepository, bookingsRepository, authRepository } from '@/shared/services/database'
+import { useState, useEffect, useMemo } from 'react'
+import { Link, useParams, useNavigate } from 'react-router-dom'
+import { ridesRepository, bookingsRepository, bookingRequestsRepository, authRepository } from '@/shared/services/database'
 import { useAuth } from '@/domains/core/auth/AuthContext'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
@@ -12,10 +12,18 @@ import { RideDetailsSEO } from '@/shared/components/SEO'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { useToast } from '@/shared/hooks/use-toast'
 import { getStoredChurchId } from '@/shared/lib/churchAttribution'
-import { formatCurrency, formatDate, calculateBookingFee } from '@/shared/lib/utils'
+import type { Booking, BookingRequest } from '@/shared/types'
+import { formatCurrency, formatDate, calculateBookingFee, getErrorMessage } from '@/shared/lib/utils'
+import { LocationPicker } from '@/domains/core/rides/components/LocationPicker'
+import { measureRoute, progressAlongRoute } from '@/domains/core/rides/lib/routeProgress'
+import {
+  DECLINE_REASON_LABELS,
+  MAX_REQUEST_ATTEMPTS,
+  useBookingRequests,
+} from '@/domains/core/rides/requests/BookingRequestsContext'
 import { useOptionalMapShell } from '@/domains/core/rides/map/MapShellContext'
+import { usePayments } from '@/shared/contexts/AppSettingsContext'
 import { useRideRouteOnMap, formatDistance, formatDuration } from '@/domains/core/rides/hooks/useRideRouteOnMap'
-import type { Booking } from '@/shared/types'
 import { ArrowLeft, Calendar, Users, Star, Phone, MessageCircle, Clock, Info, Car, Navigation, Loader2 } from 'lucide-react'
 
 type RideWithDriver = ridesRepository.RideWithDriverDetail
@@ -33,6 +41,15 @@ export default function RideDetailsPage() {
   const [seats, setSeats] = useState(1)
   const [phoneNumber, setPhoneNumber] = useState('')
   const [booking, setBooking] = useState(false)
+  // Asking the driver instead of booking instantly: the rider's own stops and offer
+  const [myRequests, setMyRequests] = useState<BookingRequest[]>([]) // this rider's requests on this ride, newest first
+  const [pickupStop, setPickupStop] = useState<Stop | null>(null)
+  const [dropoffStop, setDropoffStop] = useState<Stop | null>(null)
+  const [showStops, setShowStops] = useState(false)
+  const [offer, setOffer] = useState('') // per seat, as typed
+  const { pendingCount, version: requestsVersion } = useBookingRequests()
+  // Are bookings charged right now? Off = free: no booking fee, pay the driver directly.
+  const { paymentsEnabled } = usePayments()
 
   const isDriver = ride?.driver_id === user?.id
 
@@ -45,6 +62,20 @@ export default function RideDetailsPage() {
   const watchDriver = shell?.watchDriver
   const isMyTrip = shell?.liveTrip?.role === 'driver' && shell.liveTrip.ride.id === id
   const driverSeen = shell?.liveTrip?.ride.id === id && shell?.livePosition != null
+
+  // A guide for someone riding only part of the route: the listed price scaled by how much of the
+  // road they ride, worked out from where their stops sit along the ride's route (if it has loaded).
+  const featuredRoute = shell?.featured && shell.featured.rideId === id ? shell.featured : null
+  const suggestedShare = useMemo(() => {
+    if (!ride || !featuredRoute?.summary || (!pickupStop && !dropoffStop)) return null
+    const measure = measureRoute(featuredRoute.points)
+    const duration = featuredRoute.summary.durationMin
+    const from = pickupStop ? (progressAlongRoute(featuredRoute.points, measure, pickupStop, duration)?.fractionDone ?? 0) : 0
+    const to = dropoffStop ? (progressAlongRoute(featuredRoute.points, measure, dropoffStop, duration)?.fractionDone ?? 1) : 1
+    const part = to - from
+    if (part <= 0) return null
+    return Math.max(500, Math.round((ride.price * part) / 500) * 500)
+  }, [ride, featuredRoute, pickupStop, dropoffStop])
 
   // Show this ride on the app's main map (road route) rather than a second map inside
   // the panel. The route stays on the map after this panel closes.
@@ -63,6 +94,14 @@ export default function RideDetailsPage() {
       fetchRide()
     }
   }, [id])
+
+  // When one of this rider's requests is answered (live), reload the booking and requests quietly.
+  useEffect(() => {
+    if (!id || !user || !ride || ride.driver_id === user.id) return
+    refreshMine()
+    // Only when a request changes; the functions used are re-created on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestsVersion])
 
   useEffect(() => {
     if (profile?.phone_number) {
@@ -94,16 +133,39 @@ export default function RideDetailsPage() {
     }
 
     setRide(rideData)
+    setOffer(String(rideData.price)) // the offer starts at the listed price
 
-    // Check for existing booking
+    // Check for existing booking, and for this rider's requests on the ride
     if (user) {
       const bookingData = await bookingsRepository.getActiveBookingForRide(id, user.id)
       if (bookingData) {
         setExistingBooking(bookingData)
       }
+      if (rideData.driver_id !== user.id) {
+        try {
+          setMyRequests(await bookingRequestsRepository.getMyRequestsForRide(id, user.id))
+        } catch (error) {
+          console.error('Could not load your requests:', error)
+        }
+      }
     }
 
     setLoading(false)
+  }
+
+  // Reload just the rider's booking and requests (no spinner).
+  const refreshMine = async () => {
+    if (!id || !user) return
+    try {
+      const [bookingData, requests] = await Promise.all([
+        bookingsRepository.getActiveBookingForRide(id, user.id),
+        bookingRequestsRepository.getMyRequestsForRide(id, user.id),
+      ])
+      setExistingBooking(bookingData)
+      setMyRequests(requests)
+    } catch (error) {
+      console.error('Could not refresh your booking:', error)
+    }
   }
 
   const handleBook = async () => {
@@ -120,6 +182,11 @@ export default function RideDetailsPage() {
       return
     }
 
+    if (asksDriver && offerNumber <= 0) {
+      toast({ title: 'Enter your offer', description: 'Type how much you can pay per seat.', variant: 'destructive' })
+      return
+    }
+
     if (seats > ride.available_seats) {
       toast({
         title: 'Not enough seats',
@@ -131,26 +198,56 @@ export default function RideDetailsPage() {
 
     setBooking(true)
 
-    const bookingFee = calculateBookingFee(ride.price) * seats
-
     // Get church attribution if user came from a church landing page
     const churchId = getStoredChurchId()
 
-    // Create booking
-    let bookingData: Booking
+    // Different stops or a lower offer: ask the driver instead of booking straight away.
+    if (asksDriver) {
+      try {
+        await bookingRequestsRepository.requestBooking({
+          rideId: ride.id,
+          seats,
+          offer: offerNumber,
+          pickup: pickupStop,
+          dropoff: dropoffStop,
+          churchId,
+        })
+      } catch (requestError) {
+        console.error('Request error:', requestError)
+        toast({ title: 'Could not send the request', description: getErrorMessage(requestError), variant: 'destructive' })
+        setBooking(false)
+        return
+      }
+
+      if (!profile?.phone_number && phoneNumber) {
+        await authRepository.updateUserProfile(user.id, { phone_number: phoneNumber })
+      }
+
+      setShowBookingDialog(false)
+      toast({
+        title: 'Request sent',
+        description: "The driver will accept or refuse. You'll be told here as soon as they answer.",
+        variant: 'success',
+      })
+      await refreshMine()
+      setBooking(false)
+      return
+    }
+
+    // Book the seats. The database confirms the booking straight away while payments are
+    // off, or starts it as 'pending payment' with the booking fee while they're on.
+    let bookingId: string
     try {
-      bookingData = await bookingsRepository.createBooking({
+      bookingId = await bookingsRepository.bookRide({
         rideId: ride.id,
-        passengerId: user.id,
-        seatsBooked: seats,
-        bookingFee,
+        seats,
         churchId, // Will be null if user didn't come from a church page
       })
     } catch (bookingError) {
       console.error('Booking error:', bookingError)
       toast({
         title: 'Booking failed',
-        description: bookingError instanceof Error ? bookingError.message : 'Please try again.',
+        description: getErrorMessage(bookingError),
         variant: 'destructive',
       })
       setBooking(false)
@@ -163,15 +260,71 @@ export default function RideDetailsPage() {
     }
 
     setShowBookingDialog(false)
-    toast({
-      title: 'Booking created!',
-      description: 'Please complete payment to confirm your seat.',
-      variant: 'success',
-    })
 
-    // Navigate to payment page
-    navigate(`/bookings/${bookingData.id}/pay`, { state: { phone: phoneNumber } })
+    if (paymentsEnabled) {
+      toast({
+        title: 'Booking created!',
+        description: 'Please complete payment to confirm your seat.',
+        variant: 'success',
+      })
+      navigate(`/bookings/${bookingId}/pay`, { state: { phone: phoneNumber } })
+    } else {
+      // Nothing to pay: the seat is booked. Stay here and show the confirmed booking.
+      toast({
+        title: 'Seat booked!',
+        description: "You're confirmed. Contact the driver to arrange your pickup.",
+        variant: 'success',
+      })
+      await fetchRide()
+    }
 
+    setBooking(false)
+  }
+
+  // Place a stop on the app's main map: close the dialog so the map is usable, then reopen it.
+  const pickStop = async (kind: 'pickup' | 'dropoff') => {
+    if (!shell) return
+    setShowBookingDialog(false)
+    const point = await shell.requestPin(kind, kind === 'pickup' ? pickupStop : dropoffStop)
+    setShowBookingDialog(true)
+    if (point) {
+      if (kind === 'pickup') setPickupStop(point)
+      else setDropoffStop(point)
+    }
+  }
+
+  const handleWithdraw = async (requestId: string) => {
+    setBooking(true)
+    try {
+      await bookingRequestsRepository.withdrawRequest(requestId)
+      toast({ title: 'Request withdrawn' })
+      await refreshMine()
+    } catch (error) {
+      toast({ title: 'Could not withdraw', description: getErrorMessage(error), variant: 'destructive' })
+    }
+    setBooking(false)
+  }
+
+  // A booking left unpaid from before payments were switched off: confirm it, for free.
+  const handleConfirmFree = async () => {
+    if (!existingBooking) return
+    setBooking(true)
+    try {
+      await bookingsRepository.confirmPendingBooking(existingBooking.id)
+      toast({
+        title: 'Seat confirmed!',
+        description: "You're booked. Contact the driver to arrange your pickup.",
+        variant: 'success',
+      })
+      await fetchRide()
+    } catch (error) {
+      console.error('Confirm booking error:', error)
+      toast({
+        title: 'Could not confirm',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      })
+    }
     setBooking(false)
   }
 
@@ -194,12 +347,30 @@ export default function RideDetailsPage() {
 
   if (!ride) return null
 
-  const bookingFee = calculateBookingFee(ride.price)
+  // With payments off there is no fee: the passenger pays the driver the whole price in cash.
+  const bookingFee = paymentsEnabled ? calculateBookingFee(ride.price) : 0
   const totalBookingFee = bookingFee * seats
   const cashPayment = (ride.price - bookingFee) * seats
 
   const isPastRide = new Date(ride.departure_time) < new Date()
-  const rideIsBookable = !existingBooking && ride.available_seats > 0 && ride.status === 'active' && !isPastRide
+
+  // The rider's requests on this ride: how many attempts are left, and what state the last one is in.
+  const lastRequest = myRequests[0]
+  const waitingRequest = myRequests.find((r) => r.status === 'pending' && new Date(r.expires_at) > new Date())
+  const attemptsLeft = MAX_REQUEST_ATTEMPTS - myRequests.length
+  const blockedByDriver = myRequests.some((r) => r.blocked)
+
+  // An offer below the listed price, or their own pickup/drop-off, goes to the driver as a request.
+  const offerNumber = parseInt(offer) || 0
+  const asksDriver = !!(pickupStop || dropoffStop) || (offerNumber > 0 && offerNumber < ride.price)
+
+  const rideIsBookable =
+    !existingBooking &&
+    !waitingRequest &&
+    !blockedByDriver &&
+    ride.available_seats > 0 &&
+    ride.status === 'active' &&
+    !isPastRide
   const canBook = user && !isDriver && rideIsBookable
   const showLoginToBook = !user && rideIsBookable
 
@@ -446,18 +617,57 @@ export default function RideDetailsPage() {
                 </span>
               </div>
 
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Booking fee (10%)</span>
-                  <span>{formatCurrency(bookingFee)}</span>
+              {paymentsEnabled ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Booking fee (10%)</span>
+                    <span>{formatCurrency(bookingFee)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Pay driver in cash (90%)</span>
+                    <span>{formatCurrency(ride.price - bookingFee)}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Pay driver in cash (90%)</span>
-                  <span>{formatCurrency(ride.price - bookingFee)}</span>
-                </div>
-              </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No booking fee — you pay the driver this price in cash after the ride.
+                </p>
+              )}
             </CardContent>
           </Card>
+
+          {/* Requests to the driver: a waiting one, the last answer, and how many attempts are left */}
+          {!existingBooking && !isDriver && user && (waitingRequest || lastRequest) && (
+            <RequestStatusCard
+              waiting={waitingRequest}
+              last={lastRequest}
+              attemptsLeft={attemptsLeft}
+              blocked={blockedByDriver}
+              busy={booking}
+              onWithdraw={handleWithdraw}
+              onTryAgain={() => {
+                if (lastRequest) {
+                  setOffer(String(lastRequest.offer_price))
+                  setSeats(lastRequest.seats)
+                }
+                setShowBookingDialog(true)
+              }}
+            />
+          )}
+
+          {/* The driver's view: requests waiting for an answer */}
+          {isDriver && pendingCount > 0 && (
+            <Card className="border-primary">
+              <CardContent className="p-4 flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">
+                  {pendingCount} booking request{pendingCount > 1 ? 's' : ''} waiting for your answer
+                </p>
+                <Button asChild size="sm">
+                  <Link to="/booking-requests">Open</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Booking Status / Actions */}
           {existingBooking ? (
@@ -467,17 +677,27 @@ export default function RideDetailsPage() {
                   <>
                     <div className="flex items-center gap-2 mb-3">
                       <Clock className="w-5 h-5 text-yellow-600" />
-                      <span className="font-medium text-yellow-800">Payment Pending</span>
+                      <span className="font-medium text-yellow-800">
+                        {paymentsEnabled ? 'Payment Pending' : 'Booking not confirmed yet'}
+                      </span>
                     </div>
                     <p className="text-sm text-yellow-700 mb-4">
-                      Complete payment to confirm your booking and access driver contact.
+                      {paymentsEnabled
+                        ? 'Complete payment to confirm your booking and access driver contact.'
+                        : 'Bookings are free now. Confirm this one to get the driver\'s contact.'}
                     </p>
-                    <Button
-                      className="w-full"
-                      onClick={() => navigate(`/bookings/${existingBooking.id}/pay`)}
-                    >
-                      Complete Payment ({formatCurrency(existingBooking.booking_fee)})
-                    </Button>
+                    {paymentsEnabled ? (
+                      <Button
+                        className="w-full"
+                        onClick={() => navigate(`/bookings/${existingBooking.id}/pay`)}
+                      >
+                        Complete Payment ({formatCurrency(existingBooking.booking_fee)})
+                      </Button>
+                    ) : (
+                      <Button className="w-full" onClick={handleConfirmFree} loading={booking}>
+                        Confirm my seat — free
+                      </Button>
+                    )}
                   </>
                 ) : (
                   <>
@@ -492,8 +712,15 @@ export default function RideDetailsPage() {
                     <p className="text-sm text-green-700">
                       You have booked {existingBooking.seats_booked} seat(s). Contact the driver to coordinate pickup.
                     </p>
+                    {(existingBooking.pickup_name || existingBooking.dropoff_name) && (
+                      <p className="text-sm text-green-700 mt-1">
+                        Pickup: {existingBooking.pickup_name ?? ride.origin_name} · Drop-off:{' '}
+                        {existingBooking.dropoff_name ?? ride.destination_name}
+                      </p>
+                    )}
                     <p className="text-sm text-green-700 mt-2 font-medium">
-                      Pay {formatCurrency(cashPayment)} cash to driver after ride.
+                      Pay {formatCurrency(((existingBooking.agreed_price ?? ride.price) - existingBooking.booking_fee / existingBooking.seats_booked) * existingBooking.seats_booked)} cash to driver after ride.
+                      {existingBooking.agreed_price != null && existingBooking.agreed_price !== ride.price && ' (the price you agreed)'}
                     </p>
                   </>
                 )}
@@ -533,11 +760,19 @@ export default function RideDetailsPage() {
                 <Info className="w-4 h-4 text-navy-900 mt-0.5" />
                 <div className="text-sm text-navy-800">
                   <p className="font-medium mb-1">How booking works</p>
-                  <ul className="space-y-1">
-                    <li>1. Pay 10% booking fee ({formatCurrency(bookingFee)}/seat) via mobile money</li>
-                    <li>2. Get driver's contact after payment</li>
-                    <li>3. Pay remaining 90% ({formatCurrency(ride.price - bookingFee)}/seat) in cash to driver</li>
-                  </ul>
+                  {paymentsEnabled ? (
+                    <ul className="space-y-1">
+                      <li>1. Pay 10% booking fee ({formatCurrency(bookingFee)}/seat) via mobile money</li>
+                      <li>2. Get driver's contact after payment</li>
+                      <li>3. Pay remaining 90% ({formatCurrency(ride.price - bookingFee)}/seat) in cash to driver</li>
+                    </ul>
+                  ) : (
+                    <ul className="space-y-1">
+                      <li>1. Book your seat — it's free</li>
+                      <li>2. Get the driver's contact straight away</li>
+                      <li>3. Pay the driver {formatCurrency(ride.price)}/seat in cash after the ride</li>
+                    </ul>
+                  )}
                 </div>
               </div>
             </div>
@@ -550,7 +785,7 @@ export default function RideDetailsPage() {
         <div className="sticky bottom-0 p-4 bg-background border-t z-40">
           <PageContainer>
             <Button className="w-full" size="lg" onClick={() => setShowBookingDialog(true)}>
-              Book Seat - {formatCurrency(bookingFee)} to reserve
+              {paymentsEnabled ? `Book Seat - ${formatCurrency(bookingFee)} to reserve` : 'Book Seat — free'}
             </Button>
           </PageContainer>
         </div>
@@ -565,7 +800,7 @@ export default function RideDetailsPage() {
               size="lg"
               onClick={() => navigate('/login', { state: { from: `/rides/${id}` } })}
             >
-              Sign In to Book - {formatCurrency(bookingFee)} to reserve
+              {paymentsEnabled ? `Sign In to Book - ${formatCurrency(bookingFee)} to reserve` : 'Sign In to Book — free'}
             </Button>
           </PageContainer>
         </div>
@@ -575,9 +810,13 @@ export default function RideDetailsPage() {
       <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Book Your Seat</DialogTitle>
+            <DialogTitle>{asksDriver ? 'Ask the Driver' : 'Book Your Seat'}</DialogTitle>
             <DialogDescription>
-              Pay {formatCurrency(bookingFee)} per seat to reserve. You'll pay the remaining {formatCurrency(ride.price - bookingFee)} per seat in cash to the driver.
+              {asksDriver
+                ? "Your request goes to the driver, who accepts or refuses. You'll be told as soon as they answer."
+                : paymentsEnabled
+                ? `Pay ${formatCurrency(bookingFee)} per seat to reserve. You'll pay the remaining ${formatCurrency(ride.price - bookingFee)} per seat in cash to the driver.`
+                : `Booking is free. You'll pay the driver ${formatCurrency(ride.price)} per seat in cash after the ride.`}
             </DialogDescription>
           </DialogHeader>
 
@@ -597,8 +836,66 @@ export default function RideDetailsPage() {
               </p>
             </div>
 
+            {/* Own stops along the way, and an offer */}
+            <div className="space-y-3">
+              <button
+                type="button"
+                className="text-sm text-primary underline"
+                onClick={() => setShowStops((current) => !current)}
+              >
+                {showStops ? "Use the ride's own start and end" : 'Get in or off somewhere else along the way?'}
+              </button>
+              {showStops && (
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label>Where will you get in?</Label>
+                    <LocationPicker
+                      value={pickupStop}
+                      onChange={setPickupStop}
+                      placeholder={`${ride.origin_name} (the ride's start)`}
+                      markerColor="pickup"
+                      onPickOnMap={() => pickStop('pickup')}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Where will you get off?</Label>
+                    <LocationPicker
+                      value={dropoffStop}
+                      onChange={setDropoffStop}
+                      placeholder={`${ride.destination_name} (the ride's end)`}
+                      markerColor="dropoff"
+                      onPickOnMap={() => pickStop('dropoff')}
+                    />
+                  </div>
+                  {suggestedShare !== null && (
+                    <p className="text-xs text-muted-foreground">
+                      For your part of the trip, about {formatCurrency(suggestedShare)} per seat would be a fair share of
+                      the listed {formatCurrency(ride.price)}. It's only a guide.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="phone">Mobile money number</Label>
+              <Label htmlFor="offer">What you can pay per seat (UGX)</Label>
+              <Input
+                id="offer"
+                type="number"
+                min={500}
+                step={500}
+                value={offer}
+                onChange={(e) => setOffer(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Listed price: {formatCurrency(ride.price)}. Offering less, or choosing your own stops, sends the driver a request to
+                accept or refuse
+                {lastRequest?.status === 'declined' ? ` (attempt ${myRequests.length + 1} of ${MAX_REQUEST_ATTEMPTS})` : ''}.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">{paymentsEnabled ? 'Mobile money number' : 'Your phone number'}</Label>
               <Input
                 id="phone"
                 type="tel"
@@ -607,21 +904,33 @@ export default function RideDetailsPage() {
                 onChange={(e) => setPhoneNumber(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                You'll receive a payment prompt on this number
+                {paymentsEnabled
+                  ? "You'll receive a payment prompt on this number"
+                  : 'Shared with the driver so they can reach you about the pickup'}
               </p>
             </div>
 
             <div className="p-4 bg-muted rounded-lg space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Booking fee ({seats} seat{seats > 1 ? 's' : ''})</span>
-                <span className="font-medium">{formatCurrency(totalBookingFee)}</span>
-              </div>
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Pay driver in cash</span>
-                <span>{formatCurrency(cashPayment)}</span>
-              </div>
+              {asksDriver && (
+                <div className="flex justify-between text-sm">
+                  <span>You offer ({seats} seat{seats > 1 ? 's' : ''})</span>
+                  <span className="font-medium">{formatCurrency(offerNumber * seats)}</span>
+                </div>
+              )}
+              {!asksDriver && paymentsEnabled && (
+                <div className="flex justify-between text-sm">
+                  <span>Booking fee ({seats} seat{seats > 1 ? 's' : ''})</span>
+                  <span className="font-medium">{formatCurrency(totalBookingFee)}</span>
+                </div>
+              )}
+              {!asksDriver && (
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Pay driver in cash</span>
+                  <span>{formatCurrency(cashPayment)}</span>
+                </div>
+              )}
               <div className="flex justify-between font-medium pt-2 border-t">
-                <span>Total ride cost</span>
+                <span>{asksDriver ? 'Listed price for comparison' : 'Total ride cost'}</span>
                 <span>{formatCurrency(ride.price * seats)}</span>
               </div>
             </div>
@@ -632,12 +941,88 @@ export default function RideDetailsPage() {
               Cancel
             </Button>
             <Button onClick={handleBook} loading={booking}>
-              Pay {formatCurrency(totalBookingFee)}
+              {asksDriver ? 'Send request' : paymentsEnabled ? `Pay ${formatCurrency(totalBookingFee)}` : 'Book seat — free'}
             </Button>
           </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
     </>
+  )
+}
+
+// A place the rider picked for getting in or off
+interface Stop {
+  lat: number
+  lng: number
+  name: string
+}
+
+// Where the rider stands with the driver: a waiting request (withdraw it), or the driver's
+// answer with how many attempts remain (and a way to try again).
+function RequestStatusCard({
+  waiting,
+  last,
+  attemptsLeft,
+  blocked,
+  busy,
+  onWithdraw,
+  onTryAgain,
+}: {
+  waiting: BookingRequest | undefined
+  last: BookingRequest | undefined
+  attemptsLeft: number
+  blocked: boolean
+  busy: boolean
+  onWithdraw: (requestId: string) => void
+  onTryAgain: () => void
+}) {
+  if (waiting) {
+    return (
+      <Card className="border-yellow-500 bg-yellow-50">
+        <CardContent className="p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <Clock className="w-5 h-5 text-yellow-600" />
+            <span className="font-medium text-yellow-800">Request sent — waiting for the driver</span>
+          </div>
+          <p className="text-sm text-yellow-700 mb-3">
+            You offered {formatCurrency(waiting.offer_price)} per seat for {waiting.seats} seat{waiting.seats > 1 ? 's' : ''}
+            {waiting.pickup_name || waiting.dropoff_name
+              ? `, getting in at ${waiting.pickup_name ?? 'the start'} and off at ${waiting.dropoff_name ?? 'the end'}`
+              : ''}
+            . You'll be told here as soon as they answer.
+          </p>
+          <Button variant="outline" size="sm" disabled={busy} onClick={() => onWithdraw(waiting.id)}>
+            Withdraw request
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (last?.status !== 'declined') return null
+
+  return (
+    <Card className="border-red-300 bg-red-50">
+      <CardContent className="p-5">
+        <p className="font-medium text-red-800 mb-1">Your request was refused</p>
+        {last.decline_reason && <p className="text-sm text-red-700">{DECLINE_REASON_LABELS[last.decline_reason]}.</p>}
+        {blocked ? (
+          <p className="text-sm text-red-700 mt-2">The driver isn't taking more requests from you on this ride.</p>
+        ) : attemptsLeft > 0 ? (
+          <>
+            <p className="text-sm text-red-700 mt-2">
+              You can ask again with a different offer, seats, or pickup/drop-off ({attemptsLeft} of {MAX_REQUEST_ATTEMPTS}{' '}
+              attempt{attemptsLeft > 1 ? 's' : ''} left).
+            </p>
+            <Button size="sm" className="mt-3" onClick={onTryAgain}>
+              Ask again
+            </Button>
+          </>
+        ) : (
+          <p className="text-sm text-red-700 mt-2">You've used all {MAX_REQUEST_ATTEMPTS} requests on this ride.</p>
+        )}
+      </CardContent>
+    </Card>
   )
 }

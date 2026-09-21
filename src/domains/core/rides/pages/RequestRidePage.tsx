@@ -8,6 +8,7 @@ import { Label } from '@/shared/ui/label'
 import { Card, CardContent } from '@/shared/ui/card'
 import { LocationPicker } from '@/domains/core/rides/components/LocationPicker'
 import { useMapPins } from '@/domains/core/rides/map/MapShellContext'
+import { usePayments } from '@/shared/contexts/AppSettingsContext'
 import { useToast } from '@/shared/hooks/use-toast'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { formatCurrency } from '@/shared/lib/utils'
@@ -24,6 +25,7 @@ export default function RequestRidePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { toast } = useToast()
+  const { paymentsEnabled } = usePayments()
 
   const prefill = location.state as { origin?: Location | null; destination?: Location | null } | null
 
@@ -240,7 +242,10 @@ export default function RequestRidePage() {
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
                 <Info className="w-4 h-4 mt-0.5 shrink-0" />
                 <p>
-                  Any driver going your way can accept at your stated budget — no back-and-forth. You'll pay the 10% booking fee once a driver accepts.
+                  Any driver going your way can accept at your stated budget — no back-and-forth.{' '}
+                  {paymentsEnabled
+                    ? "You'll pay the 10% booking fee once a driver accepts."
+                    : "There's no booking fee: once a driver accepts, you pay them in cash after the ride."}
                 </p>
               </div>
 

@@ -210,7 +210,7 @@ export default function ProfilePage() {
                   onChange={(e) => setPhoneNumber(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Required for drivers and receiving refunds
+                  Required for drivers and for booking rides — shared with your trip partner
                 </p>
               </div>
               <Button type="submit" className="w-full" loading={loading}>

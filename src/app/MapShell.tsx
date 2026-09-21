@@ -231,6 +231,8 @@ function MapShellLayout({ panels }: MapShellProps) {
             position={shell.livePosition}
             route={shell.tripRoute}
             error={shell.liveError}
+            seats={shell.tripSeats}
+            onAdjustSeats={shell.adjustTripSeats}
             onStop={shell.stopLiveTrip}
           />
         </div>

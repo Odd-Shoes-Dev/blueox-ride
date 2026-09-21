@@ -9,6 +9,7 @@ import { HomePageSEO } from '@/shared/components/SEO'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { formatDate } from '@/shared/lib/utils'
 import { useMapShell } from '@/domains/core/rides/map/MapShellContext'
+import { usePayments } from '@/shared/contexts/AppSettingsContext'
 import { RideCard } from '@/domains/core/rides/components/RideCard'
 import { RoutePreviewChip } from '@/domains/core/rides/components/RoutePreviewChip'
 import { Search, Calendar, Star, Plus, ArrowRight, RefreshCw, Shield, Wallet, UserCheck, MessageSquare, Loader2, MapPin } from 'lucide-react'
@@ -42,6 +43,7 @@ export default function HomePage({
   const { user } = useAuth()
   const shell = useMapShell()
   const navigate = useNavigate()
+  const { paymentsEnabled } = usePayments()
   const {
     rides,
     ridesLoading: loading,
@@ -315,12 +317,12 @@ export default function HomePage({
                     style={brandStyles.isCustom && brandColors ? { color: brandColors.accent } : undefined}
                   />
                 </div>
-                <p className="text-xs font-medium text-navy-900">Secure Pay</p>
+                <p className="text-xs font-medium text-navy-900">{paymentsEnabled ? 'Secure Pay' : 'No fees'}</p>
                 <p 
                   className={`text-xs ${!brandStyles.isCustom ? 'text-coral-500' : ''}`}
                   style={brandStyles.isCustom && brandColors ? { color: brandColors.accent } : undefined}
                 >
-                  Mobile Money
+                  {paymentsEnabled ? 'Mobile Money' : 'Pay in cash'}
                 </p>
               </div>
             </div>
@@ -512,12 +514,12 @@ export default function HomePage({
                       2
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-navy-900">Book with 10% deposit</p>
+                      <p className="text-sm font-medium text-navy-900">{paymentsEnabled ? 'Book with 10% deposit' : 'Book your seat for free'}</p>
                       <p 
                         className={`text-xs ${!brandStyles.isCustom ? 'text-coral-500' : ''}`}
                         style={brandStyles.isCustom && brandColors ? { color: brandColors.accent } : undefined}
                       >
-                        Pay via Mobile Money to secure your seat
+                        {paymentsEnabled ? 'Pay via Mobile Money to secure your seat' : 'No booking fee — just tap Book'}
                       </p>
                     </div>
                   </div>
@@ -529,12 +531,12 @@ export default function HomePage({
                       3
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-navy-900">Travel and pay the rest</p>
+                      <p className="text-sm font-medium text-navy-900">{paymentsEnabled ? 'Travel and pay the rest' : 'Travel and pay the driver'}</p>
                       <p 
                         className={`text-xs ${!brandStyles.isCustom ? 'text-coral-500' : ''}`}
                         style={brandStyles.isCustom && brandColors ? { color: brandColors.accent } : undefined}
                       >
-                        Pay 90% in cash to your driver after the ride
+                        {paymentsEnabled ? 'Pay 90% in cash to your driver after the ride' : 'Pay the driver in cash after the ride'}
                       </p>
                     </div>
                   </div>
@@ -559,7 +561,9 @@ export default function HomePage({
               <CardContent className="p-4">
                 <h3 className="font-medium text-navy-900 mb-2">Payment reminder</h3>
                 <p className="text-sm text-navy-800">
-                  Book with 10% via Mobile Money, pay 90% cash to driver after the ride.
+                  {paymentsEnabled
+                    ? 'Book with 10% via Mobile Money, pay 90% cash to driver after the ride.'
+                    : 'Booking is free. Pay the driver the ride price in cash after the ride.'}
                 </p>
               </CardContent>
             </Card>
