@@ -163,7 +163,7 @@ export default function BookingRequestsPage() {
 
   return (
     <div className="min-h-full bg-background pb-8">
-      <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
+      <div className="bg-header text-header-foreground pt-12 max-md:pt-6 pb-6 px-4">
         <PageContainer>
           <h1 className="text-xl font-semibold text-header-foreground">Booking requests</h1>
           <p className="text-header-foreground/80 text-sm mt-1">

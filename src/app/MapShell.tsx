@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet, matchPath, useLocation } from 'react-router-dom'
-import { ChevronDown, Menu, Search } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Menu, Search } from 'lucide-react'
 import { useAuth } from '@/domains/core/auth/AuthContext'
 import { HeroLiveMap } from '@/domains/core/rides/components/HeroLiveMap'
 import { MapPlaceSearch } from '@/domains/core/rides/components/MapPlaceSearch'
@@ -10,7 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar'
 import { cn } from '@/shared/lib/utils'
 import { RoutePreviewChip } from '@/domains/core/rides/components/RoutePreviewChip'
 import { TripBar } from '@/domains/core/rides/components/TripBar'
-import { MapPanel } from '@/app/MapPanel'
+import { TripSearchStack } from '@/domains/core/rides/components/TripSearchStack'
+import { MapPanel, type SheetSnap } from '@/app/MapPanel'
 
 // Semi-transparent white surface for controls floating over the map. Text on it
 // is always navy (not theme-dependent) since what's behind it is the map.
@@ -48,12 +49,28 @@ function MapShellLayout({ panels }: MapShellProps) {
   const isPanel = panel !== undefined
   const placingPin = shell.editing !== null
 
-  // Hiding a panel keeps it mounted (forms, scroll position and all) and leaves the URL
-  // alone; a button by the logo brings it straight back. Tied to this particular visit
-  // (location.key), so opening the same screen again later starts with it showing.
+  // Larger screens: hiding the side panel keeps it mounted (forms, scroll position and all)
+  // and leaves the URL alone; the edge tab (or the pill by the logo) brings it straight back.
+  // Tied to this particular visit (location.key), so opening the same screen again later
+  // starts with it showing.
   const [collapsedFor, setCollapsedFor] = useState<string | null>(null)
   const collapsed = isPanel && collapsedFor === locationKey
   const panelOpen = isPanel && !collapsed
+
+  // Phones: the bottom sheet is pulled between a peek, half and full height instead of
+  // hidden. Also per visit, so a new screen opens at half. The map needs the height
+  // to know how much of the screen it gets.
+  const [sheet, setSheet] = useState<{ key: string; snap: SheetSnap }>({ key: '', snap: 'half' })
+  const sheetSnap: SheetSnap = sheet.key === locationKey ? sheet.snap : 'half'
+
+  // Minimising the panel (hidden on larger screens, peek on phones) is how you get back to
+  // searching: the map shows the same search card as the home screen, and expanding the
+  // panel returns to the screen you left, unchanged. Hiding is desktop-only and peek is
+  // phone-only, so each half of the condition only applies at its own screen size.
+  const peeking = sheetSnap === 'peek'
+  const showSearchCard = isPanel && (collapsed || peeking)
+  const searchCardScreens = collapsed && peeking ? '' : collapsed ? 'max-md:hidden' : 'md:hidden'
+  const routeChipHiddenOn = collapsed && peeking ? 'hidden' : collapsed ? 'md:hidden' : peeking ? 'max-md:hidden' : ''
 
   // A new screen always starts at the top.
   useEffect(() => {
@@ -61,12 +78,14 @@ function MapShellLayout({ panels }: MapShellProps) {
   }, [pathname])
 
   // Where the map is drawn. Home: the whole screen above the bottom nav. With a
-  // panel open: right of the side panel (desktop) or above the sheet (phones).
+  // panel open: right of the side panel (desktop) or above the sheet (phones — 4rem is
+  // the bottom nav, 3.5rem the sheet's peek bar; half height leaves 45% of the screen).
   // While placing a pin on a phone the sheet hides, so the map takes the full height.
+  const sheetMapHeight = sheetSnap === 'peek' ? 'h-[calc(100dvh-7.5rem)]' : 'h-[calc(45dvh-4rem)]'
   const mapFrame = cn(
-    'fixed top-0 right-0 left-0',
+    'fixed top-0 right-0 left-0 md:h-[calc(100dvh-4rem)]',
     panelOpen && 'md:left-[420px]',
-    panelOpen && !placingPin ? 'h-[calc(45dvh-4rem)] md:h-[calc(100dvh-4rem)]' : 'h-[calc(100dvh-4rem)]'
+    isPanel && !placingPin ? sheetMapHeight : 'h-[calc(100dvh-4rem)]'
   )
 
   // Pins on the map: the trip the user searched for (pickup, destination, and the dashed line
@@ -149,16 +168,16 @@ function MapShellLayout({ panels }: MapShellProps) {
           {!isPanel && <span className="font-bold text-navy-900 text-sm">Blue OX Rides</span>}
         </Link>
 
-        {/* Brings back a hidden panel exactly as it was left */}
+        {/* Larger screens: brings back a hidden panel exactly as it was left (phones
+            pull the sheet up from its peek bar instead) */}
         {collapsed && (
           <button
             type="button"
             onClick={() => setCollapsedFor(null)}
             aria-label={`Show ${panel?.title ?? 'panel'}`}
             className={cn(
-              'flex items-center gap-2 rounded-full h-9 pl-3 pr-4 text-sm font-medium text-navy-900 hover:bg-white/90 transition-colors',
-              GLASS,
-              placeSearchOpen && 'max-sm:hidden'
+              'max-md:hidden flex items-center gap-2 rounded-full h-9 pl-3 pr-4 text-sm font-medium text-navy-900 hover:bg-white/90 transition-colors',
+              GLASS
             )}
           >
             <Menu className="w-4 h-4" />
@@ -241,7 +260,13 @@ function MapShellLayout({ panels }: MapShellProps) {
       {/* On panel screens the previewed route's chip sits at the top of the visible map.
           (On the home screen it's part of the search card's stack instead.) */}
       {isPanel && shell.previewedRide && !placingPin && !(shell.liveTrip && shell.liveTrip.ride.id === shell.previewedRide.id) && (
-        <div className={cn('fixed top-36 right-0 left-0 z-[43] flex justify-center px-3 pointer-events-none', panelOpen && 'md:left-[420px]')}>
+        <div
+          className={cn(
+            'fixed top-36 right-0 left-0 z-[43] flex justify-center px-3 pointer-events-none',
+            panelOpen && 'md:left-[420px]',
+            routeChipHiddenOn // the search card below carries its own chip
+          )}
+        >
           <RoutePreviewChip
             origin={shell.previewedRide.origin_name}
             destination={shell.previewedRide.destination_name}
@@ -252,15 +277,47 @@ function MapShellLayout({ panels }: MapShellProps) {
         </div>
       )}
 
-      {isPanel ? (
-        <MapPanel
-          key={pathname}
-          onCollapse={() => setCollapsedFor(locationKey)}
-          collapsed={collapsed}
-          hideOnMobile={placingPin}
+      {/* The search card, when the panel is out of the way. Same card as the home screen;
+          hidden (not unmounted, so a pin being placed from it still lands) while placing. */}
+      {showSearchCard && (
+        <div
+          className={cn('fixed inset-x-4 z-[42] pointer-events-none', searchCardScreens, placingPin && 'hidden')}
+          style={{ top: `${5 + (shell.liveTrip ? 6.5 : 0)}rem` }}
         >
-          <Outlet />
-        </MapPanel>
+          <TripSearchStack />
+        </div>
+      )}
+
+      {isPanel ? (
+        <>
+          <MapPanel
+            key={pathname}
+            title={panel.title}
+            snap={sheetSnap}
+            onSnapChange={(snap) => setSheet({ key: locationKey, snap })}
+            onCollapse={() => setCollapsedFor(locationKey)}
+            collapsed={collapsed}
+            hideOnMobile={placingPin}
+          >
+            <Outlet />
+          </MapPanel>
+
+          {/* Larger screens: a tab on the panel's edge (like Google Maps) that hides it and
+              brings it back from the same spot. */}
+          <button
+            type="button"
+            onClick={() => setCollapsedFor(collapsed ? null : locationKey)}
+            aria-label={collapsed ? `Show ${panel.title}` : 'Hide panel'}
+            className={cn(
+              'max-md:hidden fixed top-1/2 -translate-y-1/2 z-[45] w-6 h-14 rounded-r-xl flex items-center justify-center text-navy-900 hover:bg-white transition-colors',
+              GLASS,
+              'border-l-0',
+              collapsed ? 'left-0' : 'left-[420px]'
+            )}
+          >
+            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+        </>
       ) : (
         <>
           {/* Home: the screen scrolls over the fixed map. Its first block is a

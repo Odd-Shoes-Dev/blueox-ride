@@ -384,7 +384,7 @@ export default function RideDetailsPage() {
       />
       <div className="min-h-full bg-background pb-6">
         {/* Header */}
-        <div className="bg-header text-header-foreground pt-12 pb-20 px-4">
+        <div className="bg-header text-header-foreground pt-12 max-md:pt-6 pb-20 px-4">
           <PageContainer>
             <button
               onClick={() => navigate(-1)}

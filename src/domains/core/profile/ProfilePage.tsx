@@ -133,7 +133,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-full bg-background pb-8">
       {/* Header */}
-      <div className="bg-gradient-to-b from-navy-900 to-navy-800 pt-12 pb-24 px-4">
+      <div className="bg-gradient-to-b from-navy-900 to-navy-800 pt-12 max-md:pt-6 pb-24 px-4">
         <h1 className="text-xl font-semibold text-white text-center">Profile</h1>
       </div>
 

@@ -9,11 +9,21 @@ the map or asks for the user's location again.
 
 - **Home** (`/` and the church pages) scrolls over the fixed map. The search card floats on the map.
 - **Panel screens** open on top of the map: a **420px left panel** on larger screens, a **draggable bottom sheet**
-  on phones (half height, or full). They are listed in `PANEL_ROUTES` in `src/app/App.tsx`, each with a title.
+  on phones. They are listed in `PANEL_ROUTES` in `src/app/App.tsx`, each with a title.
 - **Standalone pages** keep their own layout: login, register, terms, privacy, payment, admin. (Legal pages need
   independent links; Google sign-in leaves the site and returns; payment redirects out.)
-- A panel can be **hidden** (the button in its corner) without losing its state, and a menu pill by the logo brings
-  it back exactly as it was. The logo goes home.
+- The logo goes home. Hiding a panel never loses its state (it stays mounted):
+  - **Larger screens:** the panel-close button in its corner, or the **edge tab** (`‹` / `›`) on the panel's right
+    edge, hides it; the same tab (now at the screen's left edge) or the menu pill by the logo brings it back.
+  - **Phones:** the sheet has three heights — **peek** (just a title bar above the bottom nav, map almost full
+    screen), **half** and **full**. Drag the handle up or down, or tap it, to move between them. A new screen
+    opens at half. The map is sized to whatever the sheet leaves (`MapShell` owns the height; `MapPanel` draws it;
+    the peek bar is 3.5rem in both places, so change them together).
+- **Minimising a panel brings back the search card.** The "Where are you going?" card (`TripSearchStack`) is shown
+  by the home screen, and by any panel screen whose panel is hidden (larger screens) or at a peek (phones), so the
+  way back to searching is to slide the panel away, and expanding it returns to the screen you left, with its form
+  intact. It's the same card and the same trip (the shell holds pickup and destination). It stays off while a
+  panel is half or fully open, where it would crowd the map.
 
 ## Shared map state
 

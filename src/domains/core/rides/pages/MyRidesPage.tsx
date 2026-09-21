@@ -380,7 +380,7 @@ export default function MyRidesPage() {
   if (error) {
     return (
       <div className="min-h-full bg-background pb-8">
-        <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
+        <div className="bg-header text-header-foreground pt-12 max-md:pt-6 pb-6 px-4">
           <PageContainer>
             <h1 className="text-xl font-semibold text-header-foreground">My Rides</h1>
           </PageContainer>
@@ -402,7 +402,7 @@ export default function MyRidesPage() {
   return (
     <div className="min-h-full bg-background pb-8">
       {/* Header */}
-      <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
+      <div className="bg-header text-header-foreground pt-12 max-md:pt-6 pb-6 px-4">
         <PageContainer>
           <h1 className="text-xl font-semibold text-header-foreground">My Rides</h1>
         </PageContainer>

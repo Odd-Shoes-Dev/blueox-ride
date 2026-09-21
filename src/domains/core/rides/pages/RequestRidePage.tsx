@@ -123,7 +123,7 @@ export default function RequestRidePage() {
   return (
     <div className="min-h-full bg-background pb-8">
       {/* Header */}
-      <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
+      <div className="bg-header text-header-foreground pt-12 max-md:pt-6 pb-6 px-4">
         <PageContainer>
           <button
             onClick={() => navigate(-1)}
