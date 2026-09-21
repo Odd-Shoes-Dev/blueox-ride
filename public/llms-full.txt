@@ -30,7 +30,7 @@ To revolutionize transportation in Uganda by making travel more affordable, redu
 - Can search and book rides
 - View ride history
 - Rate drivers after trips
-- Pay via mobile money
+- Pay the driver in cash after the ride
 
 **Drivers**
 - Must verify identity and vehicle
@@ -61,15 +61,15 @@ Each ride displays:
 1. Select ride from search results
 2. Choose number of seats
 3. Review booking details
-4. Confirm and pay via mobile money
+4. Confirm your booking (free — no booking fee)
 5. Receive booking confirmation
 6. Get driver contact details
 
 ### Payment System
-- **Supported Methods**: MTN Mobile Money, Airtel Money
+- **Booking**: currently free — no booking fee is charged
+- **Paying the driver**: passengers pay the driver the ride price directly, in cash, after the ride
 - **Currency**: UGX (Ugandan Shilling)
-- **Processing**: Secure payment gateway integration
-- **Payouts**: Drivers receive funds after trip completion
+- **Online payments**: not currently offered; they may be introduced in future
 
 ## Church Partnership Program
 
@@ -170,7 +170,7 @@ BlueOx Rides is typically:
 A: Yes, BlueOx Rides covers all of Uganda. Drivers can post rides on any route.
 
 **Q: How do I pay for my ride?**
-A: Payment is made securely through mobile money (MTN or Airtel) when you book.
+A: Booking is currently free. You pay the driver the ride price in cash after the ride.
 
 **Q: Can I cancel a booking?**
 A: Yes, cancellation policies vary by driver. Check the ride details before booking.
@@ -182,7 +182,7 @@ A: Register an account, verify your identity and vehicle, then start posting rid
 A: Yes, private carpooling where costs are shared is legal in Uganda.
 
 **Q: What if my driver doesn't show up?**
-A: Contact our support team for assistance with refunds or rebooking.
+A: Contact our support team for assistance or rebooking.
 
 **Q: Can I book multiple seats?**
 A: Yes, you can book multiple seats for group travel.

@@ -137,6 +137,9 @@ export interface MapShellValue {
   livePosition: LivePosition | null
   liveError: string | null
   tripRoute: { points: [number, number][]; summary: { distanceKm: number; durationMin: number } | null } | null
+  // The driver's seats during a trip, and a way to change them (-1 = picked someone up on the road)
+  tripSeats: { available: number; total: number } | null
+  adjustTripSeats: (delta: number) => Promise<void>
   startDriverTrip: (ride: PreviewableRide) => void
   watchDriver: (ride: PreviewableRide) => void
   stopLiveTrip: () => void

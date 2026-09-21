@@ -111,6 +111,14 @@ export async function searchRidesNear(filters: {
   return data as RideWithDriverRow[]
 }
 
+// Change a ride's "seats left" by hand (delta of -1 = someone got in, +1 = a seat freed up).
+// Returns the new number of seats left. The database refuses to go below 0 or above the total.
+export async function adjustSeats(rideId: string, delta: number): Promise<number> {
+  const { data, error } = await supabase.rpc('adjust_ride_seats', { p_ride_id: rideId, p_delta: delta })
+  if (error) throw error
+  return data as number
+}
+
 // A driver's own upcoming rides (soonest first) — used to show "your ride" on the map.
 export async function getUpcomingRidesForDriver(driverId: string, limit = 5): Promise<RideWithDriverRow[]> {
   const { data, error } = await supabase

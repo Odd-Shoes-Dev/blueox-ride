@@ -96,7 +96,7 @@ export default function LoginPage() {
           </form>
 
           <p className="mt-4 text-xs text-center text-muted-foreground">
-            By continuing, you agree to our{' '}
+            The first time you sign in, we'll ask you to agree to our{' '}
             <Link to="/terms" className="underline hover:text-foreground">Terms of Use</Link> and{' '}
             <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.
           </p>

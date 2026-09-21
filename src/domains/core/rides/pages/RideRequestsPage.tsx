@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from '@/shared/hooks/use-toast'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { formatCurrency, formatDate } from '@/shared/lib/utils'
+import { usePayments } from '@/shared/contexts/AppSettingsContext'
 import type { RideRequest } from '@/shared/types'
 import { ArrowLeft, Calendar, Users, Wallet, MessageSquare } from 'lucide-react'
 
@@ -17,6 +18,7 @@ export default function RideRequestsPage() {
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { paymentsEnabled } = usePayments()
 
   const [requests, setRequests] = useState<RideRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -100,7 +102,7 @@ export default function RideRequestsPage() {
   return (
     <div className="min-h-full bg-background pb-8">
       {/* Header */}
-      <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
+      <div className="bg-header text-header-foreground pt-12 max-md:pt-6 pb-6 px-4">
         <PageContainer>
           <button
             onClick={() => navigate(-1)}
@@ -198,7 +200,7 @@ export default function RideRequestsPage() {
             <DialogDescription>
               You'll offer this ride at the passenger's stated budget of{' '}
               {acceptTarget && formatCurrency(acceptTarget.budget)} per seat. This creates a real ride on
-              your account, ready for the passenger to pay their booking fee.
+              your account, {paymentsEnabled ? 'ready for the passenger to pay their booking fee.' : 'and the passenger is booked straight away. They pay you in cash after the ride.'}
             </DialogDescription>
           </DialogHeader>
 

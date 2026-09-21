@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { LEGAL } from '@/domains/core/legal/legalConfig'
+import { usePayments } from '@/shared/contexts/AppSettingsContext'
 import {
   LegalLayout,
   LegalList,
@@ -7,6 +8,56 @@ import {
   SupportEmail,
   type LegalSection,
 } from '@/domains/core/legal/LegalLayout'
+
+// Payments are switched off while the Service is free (see the app setting). These bits of the
+// policy follow it, so the policy always describes what the app actually does.
+function PaymentInfoNote() {
+  const { paymentsEnabled } = usePayments()
+
+  if (!paymentsEnabled) {
+    return (
+      <>
+        <p className="font-medium text-foreground pt-2">Payments</p>
+        <p>
+          Blue OX Rides does not currently take payments: you pay the driver directly, in cash. We therefore do not
+          collect payment card or mobile money details.
+        </p>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <p className="font-medium text-foreground pt-2">Payment information</p>
+      <p>
+        When you pay a booking fee by mobile money, we record the amount, the mobile money phone number you paid from,
+        the payment status and the reference numbers from our payment provider. We never see or store your mobile money
+        PIN or card details — those are handled by the payment provider and your mobile money operator.
+      </p>
+    </>
+  )
+}
+
+function ProcessBookingsUse() {
+  const { paymentsEnabled } = usePayments()
+  return (
+    <>
+      Show rides, match passengers with drivers, and process bookings
+      {paymentsEnabled ? ', payments and refunds' : ''}.
+    </>
+  )
+}
+
+function PesapalItem() {
+  const { paymentsEnabled } = usePayments()
+  if (!paymentsEnabled) return null
+  return (
+    <li>
+      <strong>Pesapal</strong> — processes mobile money payments and refunds. Receives the amount, your mobile money
+      number and payment references.
+    </li>
+  )
+}
 
 const sections: LegalSection[] = [
   {
@@ -44,6 +95,10 @@ const sections: LegalSection[] = [
             Passwords are stored in hashed form by our authentication provider; we cannot read them.
           </li>
           <li>
+            <strong>Your agreement:</strong> when you agreed to the Terms of Use and this Privacy Policy, and which
+            version, so we can show that you did.
+          </li>
+          <li>
             <strong>Driver details:</strong> vehicle information and photos of your car, and the rides you offer
             (route, departure time, price per seat and number of seats).
           </li>
@@ -58,13 +113,7 @@ const sections: LegalSection[] = [
             <strong>Messages to us</strong> when you contact support, and anything you include in them.
           </li>
         </LegalList>
-        <p className="font-medium text-foreground pt-2">Payment information</p>
-        <p>
-          When you pay a booking fee by mobile money, we record the amount, the mobile money phone number you paid
-          from, the payment status and the reference numbers from our payment provider. We never see or store your
-          mobile money PIN or card details — those are handled by the payment provider and your mobile money
-          operator.
-        </p>
+        <PaymentInfoNote />
         <p className="font-medium text-foreground pt-2">Location information</p>
         <LegalList>
           <li>
@@ -73,10 +122,11 @@ const sections: LegalSection[] = [
             saved only if you choose it as the pickup or destination of a ride or request you post.
           </li>
           <li>
-            <strong>Live driver location.</strong> If you are a driver and switch on location sharing for a trip,
-            your position is sent in real time to passengers with a confirmed booking on that ride. It is relayed
-            live and is <strong>not stored</strong> in our database. Sharing stops when you turn it off or leave the
-            ride page.
+            <strong>Live driver location.</strong> If you are a driver and start a trip with location sharing,
+            your position is sent in real time to passengers with a confirmed booking on that ride. We confirm with
+            you each time you start a trip. It is sent over a private channel that only you and those passengers can
+            join, it is relayed live and is <strong>not stored</strong> in our database. It stops when you end the
+            trip.
           </li>
           <li>
             <strong>Places you search or pick</strong> on the map. The text you type and the map position are sent
@@ -108,7 +158,9 @@ const sections: LegalSection[] = [
       <>
         <LegalList>
           <li>Create and secure your account and sign you in.</li>
-          <li>Show rides, match passengers with drivers, and process bookings, payments and refunds.</li>
+          <li>
+            <ProcessBookingsUse />
+          </li>
           <li>Let drivers and passengers contact each other once a booking is confirmed.</li>
           <li>Show maps, routes and live driver position.</li>
           <li>Display ratings and reviews so people can decide whom to travel with.</li>
@@ -169,10 +221,7 @@ const sections: LegalSection[] = [
             <strong>Supabase</strong> — our database, sign-in, file storage and real-time messaging. Holds your
             account, rides, bookings and uploaded photos.
           </li>
-          <li>
-            <strong>Pesapal</strong> — processes mobile money payments and refunds. Receives the amount, your
-            mobile money number and payment references.
-          </li>
+          <PesapalItem />
           <li>
             <strong>Google</strong> — only if you choose "Continue with Google". Google's own{' '}
             <LegalLink href="https://policies.google.com/privacy">Privacy Policy</LegalLink> applies to your Google

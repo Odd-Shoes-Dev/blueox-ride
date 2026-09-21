@@ -8,12 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/sha
 import { RegisterPageSEO } from '@/shared/components/SEO'
 import { useToast } from '@/shared/hooks/use-toast'
 import { GoogleSignInButton } from '@/domains/core/auth/GoogleSignInButton'
+import { TermsCheckbox } from '@/domains/core/legal/TermsCheckbox'
+import { LEGAL } from '@/domains/core/legal/legalConfig'
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [loading, setLoading] = useState(false)
   const { signUp } = useAuth()
   const navigate = useNavigate()
@@ -31,6 +34,15 @@ export default function RegisterPage() {
       return
     }
 
+    if (!agreedToTerms) {
+      toast({
+        title: 'Please agree to continue',
+        description: 'Tick the box to agree to the Terms of Use and Privacy Policy.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     if (password.length < 6) {
       toast({
         title: 'Password too short',
@@ -42,7 +54,7 @@ export default function RegisterPage() {
 
     setLoading(true)
 
-    const { error } = await signUp(email, password, fullName)
+    const { error } = await signUp(email, password, fullName, LEGAL.consentVersion)
 
     if (error) {
       toast({
@@ -128,15 +140,14 @@ export default function RegisterPage() {
                 autoComplete="new-password"
               />
             </div>
+            <TermsCheckbox id="register-agree" checked={agreedToTerms} onChange={setAgreedToTerms} />
             <Button type="submit" className="w-full" loading={loading}>
               Create Account
             </Button>
           </form>
 
           <p className="mt-4 text-xs text-center text-muted-foreground">
-            By signing up, you agree to our{' '}
-            <Link to="/terms" className="underline hover:text-foreground">Terms of Use</Link> and{' '}
-            <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.
+            Signing up with Google? We'll ask you to agree to the Terms and Privacy Policy right after.
           </p>
 
             <div className="mt-6 text-center text-sm">

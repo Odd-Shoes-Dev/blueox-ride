@@ -16,6 +16,8 @@ export * as carPhotosRepository from './carPhotosRepository'
 export * as churchRepository from './churchRepository'
 export * as rideRequestsRepository from './rideRequestsRepository'
 export * as reviewsRepository from './reviewsRepository'
+export * as settingsRepository from './settingsRepository'
+export * as bookingRequestsRepository from './bookingRequestsRepository'
 export {
   createLocationBroadcaster,
   subscribeToDriverLocation,

@@ -14,12 +14,21 @@ export function onAuthStateChange(callback: (event: string, session: Session | n
   return supabase.auth.onAuthStateChange(callback)
 }
 
-export async function signUp(email: string, password: string, fullName: string) {
+// `termsVersion` is the version of the Terms/Privacy Policy the person ticked the box for;
+// the signup trigger saves it (and the time) on their profile.
+export async function signUp(email: string, password: string, fullName: string, termsVersion?: string) {
   const { error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName } },
+    options: { data: { full_name: fullName, ...(termsVersion ? { terms_version: termsVersion } : {}) } },
   })
+  return { error: error as Error | null }
+}
+
+// Records that the signed-in user agreed to `version` of the Terms and Privacy Policy.
+// The time is set by the database.
+export async function acceptTerms(version: string) {
+  const { error } = await supabase.rpc('accept_terms', { p_version: version })
   return { error: error as Error | null }
 }
 

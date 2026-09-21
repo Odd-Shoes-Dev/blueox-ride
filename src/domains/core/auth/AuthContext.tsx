@@ -2,17 +2,21 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef, ty
 import { authRepository, checkSessionHealth, forceLogout, RequestTimeoutError } from '@/shared/services/database'
 import type { SupabaseUser, Session } from '@/shared/services/database/authRepository'
 import type { User } from '@/shared/types'
+import { LEGAL } from '@/domains/core/legal/legalConfig'
 
 interface AuthContextType {
   user: SupabaseUser | null
   profile: User | null
   session: Session | null
   loading: boolean
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>
+  // True when the signed-in user hasn't agreed to the current Terms and Privacy Policy yet
+  needsConsent: boolean
+  signUp: (email: string, password: string, fullName: string, termsVersion?: string) => Promise<{ error: Error | null }>
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
   signInWithGoogle: (redirectPath?: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
   updateProfile: (updates: Partial<User>) => Promise<{ error: Error | null }>
+  acceptTerms: () => Promise<{ error: Error | null }>
   refreshProfile: () => Promise<void>
 }
 
@@ -167,8 +171,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Run once on mount - performHealthCheck is stable via ref
 
-  const signUp = async (email: string, password: string, fullName: string) => {
-    return authRepository.signUp(email, password, fullName)
+  const signUp = async (email: string, password: string, fullName: string, termsVersion?: string) => {
+    return authRepository.signUp(email, password, fullName, termsVersion)
+  }
+
+  // Needs a loaded profile that HAS the consent columns (they're missing until migration 11 has
+  // been run — then nobody is asked, rather than everyone being locked out).
+  const needsConsent =
+    !!user &&
+    !!profile &&
+    profile.terms_accepted_at !== undefined &&
+    (!profile.terms_accepted_at || profile.terms_version !== LEGAL.consentVersion)
+
+  const acceptTerms = async (): Promise<{ error: Error | null }> => {
+    if (!user) return { error: new Error('Not authenticated') }
+    const { error } = await authRepository.acceptTerms(LEGAL.consentVersion)
+    if (!error) {
+      setProfile((prev) =>
+        prev ? { ...prev, terms_accepted_at: new Date().toISOString(), terms_version: LEGAL.consentVersion } : prev
+      )
+    }
+    return { error }
   }
 
   const signIn = async (email: string, password: string) => {
@@ -219,11 +242,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile,
     session,
     loading,
+    needsConsent,
     signUp,
     signIn,
     signInWithGoogle,
     signOut,
     updateProfile,
+    acceptTerms,
     refreshProfile,
   }
 

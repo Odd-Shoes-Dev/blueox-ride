@@ -2,6 +2,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from '@/domains/core/auth/AuthContext'
 import { ThemeProvider } from '@/shared/contexts/ThemeContext'
+import { AppSettingsProvider } from '@/shared/contexts/AppSettingsProvider'
+import { usePayments } from '@/shared/contexts/AppSettingsContext'
+import { BookingRequestsProvider } from '@/domains/core/rides/requests/BookingRequestsProvider'
 import { Toaster } from '@/shared/ui/toaster'
 import { BottomNav } from '@/app/BottomNav'
 import { SiteLogoLayout } from '@/app/SiteLogoLayout'
@@ -20,10 +23,12 @@ import SearchPage from '@/domains/core/rides/pages/SearchPage'
 import RideRequestsPage from '@/domains/core/rides/pages/RideRequestsPage'
 import RequestRidePage from '@/domains/core/rides/pages/RequestRidePage'
 import SearchResultsPage from '@/domains/core/rides/pages/SearchResultsPage'
+import BookingRequestsPage from '@/domains/core/rides/pages/BookingRequestsPage'
 import ChurchLandingPage from '@/domains/church/ChurchLandingPage'
 import AdminChurchPayoutsPage from '@/domains/church/AdminChurchPayoutsPage'
 import PrivacyPolicyPage from '@/domains/core/legal/PrivacyPolicyPage'
 import TermsPage from '@/domains/core/legal/TermsPage'
+import { ConsentScreen } from '@/domains/core/legal/ConsentScreen'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,6 +60,22 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// The payment screen only exists while payments are switched on. With them off nothing is
+// owed, so anyone who lands here (an old link, a bookmark) is sent to their rides instead.
+function PaymentsOnly({ children }: { children: React.ReactNode }) {
+  const { paymentsEnabled, loading } = usePayments()
+
+  if (loading) {
+    return (
+      <div className="min-h-[60dvh] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    )
+  }
+  if (!paymentsEnabled) return <Navigate to="/my-rides" replace />
+  return <>{children}</>
+}
+
 // Layout with bottom nav - shows for all users, different nav for logged in
 function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -75,12 +96,16 @@ const PANEL_ROUTES: { path: string; title: string; element: React.ReactNode }[] 
   { path: '/requests', title: 'Ride requests', element: <RideRequestsPage /> },
   { path: '/rides/create', title: 'Offer a ride', element: <ProtectedRoute><CreateRidePage /></ProtectedRoute> },
   { path: '/requests/new', title: 'Request a ride', element: <ProtectedRoute><RequestRidePage /></ProtectedRoute> },
+  { path: '/booking-requests', title: 'Booking requests', element: <ProtectedRoute><BookingRequestsPage /></ProtectedRoute> },
   { path: '/my-rides', title: 'My rides', element: <ProtectedRoute><MyRidesPage /></ProtectedRoute> },
   { path: '/profile', title: 'Profile', element: <ProtectedRoute><ProfilePage /></ProtectedRoute> },
 ]
 
 function AppRoutes() {
-  const { loading } = useAuth()
+  const { loading, needsConsent } = useAuth()
+  const { pathname } = useLocation()
+  // The Terms and Privacy Policy stay readable from the consent screen (its links open new tabs)
+  const readingLegalPages = pathname === '/terms' || pathname === '/privacy'
 
   if (loading) {
     return (
@@ -96,6 +121,10 @@ function AppRoutes() {
       </div>
     )
   }
+
+  // Signed in but haven't agreed to the current Terms and Privacy Policy yet (Google sign-ins,
+  // older accounts, or after a material change): nothing else until they do.
+  if (needsConsent && !readingLegalPages) return <ConsentScreen />
 
   return (
     <AppLayout>
@@ -125,9 +154,11 @@ function AppRoutes() {
           <Route
             path="/bookings/:id/pay"
             element={
-              <ProtectedRoute>
-                <PaymentPage />
-              </ProtectedRoute>
+              <PaymentsOnly>
+                <ProtectedRoute>
+                  <PaymentPage />
+                </ProtectedRoute>
+              </PaymentsOnly>
             }
           />
           <Route
@@ -151,12 +182,16 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <Router>
-          <AuthProvider>
-            <AppRoutes />
-            <Toaster />
-          </AuthProvider>
-        </Router>
+        <AppSettingsProvider>
+          <Router>
+            <AuthProvider>
+              <BookingRequestsProvider>
+                <AppRoutes />
+              </BookingRequestsProvider>
+              <Toaster />
+            </AuthProvider>
+          </Router>
+        </AppSettingsProvider>
       </ThemeProvider>
     </QueryClientProvider>
   )

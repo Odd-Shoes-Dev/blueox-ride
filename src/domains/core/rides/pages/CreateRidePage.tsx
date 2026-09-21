@@ -8,6 +8,7 @@ import { Label } from '@/shared/ui/label'
 import { Card, CardContent } from '@/shared/ui/card'
 import { LocationPicker } from '@/domains/core/rides/components/LocationPicker'
 import { useMapPins, useOptionalMapShell } from '@/domains/core/rides/map/MapShellContext'
+import { usePayments } from '@/shared/contexts/AppSettingsContext'
 import { CarPhotoUpload } from '@/domains/core/rides/components/CarPhotoUpload'
 import { useToast } from '@/shared/hooks/use-toast'
 import { PageContainer } from '@/shared/components/PageContainer'
@@ -26,6 +27,7 @@ export default function CreateRidePage() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const shell = useOptionalMapShell()
+  const { paymentsEnabled } = usePayments()
 
   const [origin, setOrigin] = useState<Location | null>(null)
   const [destination, setDestination] = useState<Location | null>(null)
@@ -181,7 +183,7 @@ export default function CreateRidePage() {
   return (
     <div className="min-h-full bg-background pb-8">
       {/* Header */}
-      <div className="bg-header text-header-foreground pt-12 pb-6 px-4">
+      <div className="bg-header text-header-foreground pt-12 max-md:pt-6 pb-6 px-4">
         <PageContainer>
           <button
             onClick={() => navigate(-1)}
@@ -297,14 +299,23 @@ export default function CreateRidePage() {
                     <span className="text-muted-foreground">Your price per seat</span>
                     <span className="font-medium">{formatCurrency(priceNum)}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Passenger pays to book (10%)</span>
-                    <span className="text-navy-900">{formatCurrency(bookingFee)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm pt-2 border-t border-coral-200">
-                    <span className="text-muted-foreground">You receive in cash (90%)</span>
-                    <span className="font-semibold">{formatCurrency(priceNum - bookingFee)}</span>
-                  </div>
+                  {paymentsEnabled ? (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Passenger pays to book (10%)</span>
+                        <span className="text-navy-900">{formatCurrency(bookingFee)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm pt-2 border-t border-coral-200">
+                        <span className="text-muted-foreground">You receive in cash (90%)</span>
+                        <span className="font-semibold">{formatCurrency(priceNum - bookingFee)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex justify-between text-sm pt-2 border-t border-coral-200">
+                      <span className="text-muted-foreground">You receive in cash (no fee)</span>
+                      <span className="font-semibold">{formatCurrency(priceNum)}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -434,7 +445,9 @@ export default function CreateRidePage() {
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
                 <Info className="w-4 h-4 mt-0.5 shrink-0" />
                 <p>
-                  Passengers pay 10% booking fee online. You collect the remaining 90% in cash after the ride.
+                  {paymentsEnabled
+                    ? 'Passengers pay 10% booking fee online. You collect the remaining 90% in cash after the ride.'
+                    : 'Booking is free for passengers. You collect the full price in cash after the ride.'}
                 </p>
               </div>
 

@@ -1,17 +1,16 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { rideRequestsRepository } from '@/shared/services/database'
 import { useAuth } from '@/domains/core/auth/AuthContext'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
-import { LocationPicker } from '@/domains/core/rides/components/LocationPicker'
 import { HomePageSEO } from '@/shared/components/SEO'
 import { PageContainer } from '@/shared/components/PageContainer'
-import { formatDate } from '@/shared/lib/utils'
 import { useMapShell } from '@/domains/core/rides/map/MapShellContext'
+import { usePayments } from '@/shared/contexts/AppSettingsContext'
 import { RideCard } from '@/domains/core/rides/components/RideCard'
-import { RoutePreviewChip } from '@/domains/core/rides/components/RoutePreviewChip'
-import { Search, Calendar, Star, Plus, ArrowRight, RefreshCw, Shield, Wallet, UserCheck, MessageSquare, Loader2, MapPin } from 'lucide-react'
+import { TripSearchStack } from '@/domains/core/rides/components/TripSearchStack'
+import { Calendar, Plus, ArrowRight, RefreshCw, Shield, Wallet, UserCheck, MessageSquare } from 'lucide-react'
 import type { BrandColors } from '@/shared/types/branding'
 
 // Semi-transparent white surface for controls floating over the map. Text on it is
@@ -41,23 +40,14 @@ export default function HomePage({
 }: HomePageProps = {}) {
   const { user } = useAuth()
   const shell = useMapShell()
-  const navigate = useNavigate()
+  const { paymentsEnabled } = usePayments()
   const {
     rides,
     ridesLoading: loading,
     ridesError: error,
     refreshRides: fetchRides,
-    searching,
-    origin: searchOrigin,
-    destination: searchDestination,
-    setOrigin: setSearchOrigin,
-    setDestination: setSearchDestination,
-    locatingUser,
-    usingAutoPickup,
-    setManualPickupOverride,
   } = shell
   const placingPin = shell.editing !== null
-  const myNextRide = user ? shell.myRides[0] : undefined
   // A live trip bar sits at the top of the map, so the cards below it shift down to make room.
   const tripOffsetRem = shell.liveTrip ? 6.5 : 0
   const [openRequestCount, setOpenRequestCount] = useState<number | null>(null)
@@ -94,13 +84,6 @@ export default function HomePage({
       .then((requests) => setOpenRequestCount(requests.length))
       .catch(() => setOpenRequestCount(null))
   }, [])
-
-  // Look for rides near the pickup and destination, then open the results next to the map.
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    await shell.searchRides()
-    navigate('/results')
-  }
 
   return (
     <>
@@ -144,110 +127,7 @@ export default function HomePage({
           className={`absolute inset-x-4 z-20 pointer-events-none ${placingPin ? 'hidden' : ''}`}
           style={{ top: `${(churchName ? 9 : 5) + tripOffsetRem}rem` }}
         >
-          <div className="max-w-md mx-auto">
-            <Card className={`shadow-xl text-navy-900 ${GLASS}`}>
-              <CardContent className="p-4">
-                {locatingUser ? (
-                  <div className="flex items-center gap-2 text-navy-900/70 py-2 text-sm">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Finding your location...
-                  </div>
-                ) : usingAutoPickup && searchOrigin ? (
-                  <form onSubmit={handleSearch} className="space-y-2">
-                    <div className="flex items-center justify-between text-xs text-navy-900/70 px-1">
-                      <span className="flex items-center gap-1 truncate">
-                        <MapPin className="w-3 h-3 flex-shrink-0 text-green-600" />
-                        <span className="truncate">From {searchOrigin.name}</span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setManualPickupOverride(true)}
-                        className="text-navy-900 font-medium underline flex-shrink-0 ml-2"
-                      >
-                        Change
-                      </button>
-                    </div>
-                    <LocationPicker
-                      value={searchDestination}
-                      onChange={setSearchDestination}
-                      placeholder="Where are you going?"
-                      markerColor="dropoff"
-                      glass
-                    />
-                    <Button type="submit" className="w-full" size="lg" disabled={searching || !searchDestination}>
-                      {searching ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                          Searching...
-                        </>
-                      ) : (
-                        <>
-                          <Search className="w-4 h-4 mr-2" />
-                          Find a Ride
-                        </>
-                      )}
-                    </Button>
-                  </form>
-                ) : (
-                  <form onSubmit={handleSearch} className="space-y-3">
-                    <LocationPicker
-                      value={searchOrigin}
-                      onChange={setSearchOrigin}
-                      placeholder="Leaving from..."
-                      markerColor="pickup"
-                      glass
-                    />
-                    <LocationPicker
-                      value={searchDestination}
-                      onChange={setSearchDestination}
-                      placeholder="Going to..."
-                      markerColor="dropoff"
-                      glass
-                    />
-                    <Button type="submit" className="w-full" size="lg" disabled={searching}>
-                      {searching ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                          Searching...
-                        </>
-                      ) : (
-                        <>
-                          <Search className="w-4 h-4 mr-2" />
-                          Find a Ride
-                        </>
-                      )}
-                    </Button>
-                  </form>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* A ride whose route the user chose to see stays on the map until cleared */}
-            {shell.previewedRide && (
-              <RoutePreviewChip
-                className="mt-3"
-                origin={shell.previewedRide.origin_name}
-                destination={shell.previewedRide.destination_name}
-                summary={shell.featured?.summary ?? null}
-                loading={shell.featuredStatus === 'loading'}
-                onClear={() => shell.previewRide(null)}
-              />
-            )}
-
-            {/* The driver's own next ride (its route is drawn on the map) */}
-            {myNextRide && !shell.previewedRide && (
-              <Link
-                to={`/rides/${myNextRide.id}`}
-                className={`mt-3 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm text-navy-900 hover:bg-white/90 transition-colors ${GLASS}`}
-              >
-                <Star className="w-4 h-4 flex-shrink-0" />
-                <span className="truncate">
-                  <strong>Your next ride</strong> · {myNextRide.origin_name} → {myNextRide.destination_name}
-                </span>
-                <span className="ml-auto pl-2 text-xs text-navy-900/70 whitespace-nowrap">{formatDate(myNextRide.departure_time)}</span>
-              </Link>
-            )}
-          </div>
+          <TripSearchStack />
         </div>
       </div>
 
@@ -315,12 +195,12 @@ export default function HomePage({
                     style={brandStyles.isCustom && brandColors ? { color: brandColors.accent } : undefined}
                   />
                 </div>
-                <p className="text-xs font-medium text-navy-900">Secure Pay</p>
+                <p className="text-xs font-medium text-navy-900">{paymentsEnabled ? 'Secure Pay' : 'No fees'}</p>
                 <p 
                   className={`text-xs ${!brandStyles.isCustom ? 'text-coral-500' : ''}`}
                   style={brandStyles.isCustom && brandColors ? { color: brandColors.accent } : undefined}
                 >
-                  Mobile Money
+                  {paymentsEnabled ? 'Mobile Money' : 'Pay in cash'}
                 </p>
               </div>
             </div>
@@ -512,12 +392,12 @@ export default function HomePage({
                       2
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-navy-900">Book with 10% deposit</p>
+                      <p className="text-sm font-medium text-navy-900">{paymentsEnabled ? 'Book with 10% deposit' : 'Book your seat for free'}</p>
                       <p 
                         className={`text-xs ${!brandStyles.isCustom ? 'text-coral-500' : ''}`}
                         style={brandStyles.isCustom && brandColors ? { color: brandColors.accent } : undefined}
                       >
-                        Pay via Mobile Money to secure your seat
+                        {paymentsEnabled ? 'Pay via Mobile Money to secure your seat' : 'No booking fee — just tap Book'}
                       </p>
                     </div>
                   </div>
@@ -529,12 +409,12 @@ export default function HomePage({
                       3
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-navy-900">Travel and pay the rest</p>
+                      <p className="text-sm font-medium text-navy-900">{paymentsEnabled ? 'Travel and pay the rest' : 'Travel and pay the driver'}</p>
                       <p 
                         className={`text-xs ${!brandStyles.isCustom ? 'text-coral-500' : ''}`}
                         style={brandStyles.isCustom && brandColors ? { color: brandColors.accent } : undefined}
                       >
-                        Pay 90% in cash to your driver after the ride
+                        {paymentsEnabled ? 'Pay 90% in cash to your driver after the ride' : 'Pay the driver in cash after the ride'}
                       </p>
                     </div>
                   </div>
@@ -559,7 +439,9 @@ export default function HomePage({
               <CardContent className="p-4">
                 <h3 className="font-medium text-navy-900 mb-2">Payment reminder</h3>
                 <p className="text-sm text-navy-800">
-                  Book with 10% via Mobile Money, pay 90% cash to driver after the ride.
+                  {paymentsEnabled
+                    ? 'Book with 10% via Mobile Money, pay 90% cash to driver after the ride.'
+                    : 'Booking is free. Pay the driver the ride price in cash after the ride.'}
                 </p>
               </CardContent>
             </Card>

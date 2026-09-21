@@ -25,6 +25,17 @@ export function formatDate(date: Date | string): string {
   }).format(d)
 }
 
+// The message from an error of any shape (a JavaScript Error, or the plain error object the
+// database client throws), for showing to the user.
+export function getErrorMessage(error: unknown, fallback = 'Please try again.'): string {
+  if (error instanceof Error && error.message) return error.message
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = (error as { message: unknown }).message
+    if (typeof message === 'string' && message) return message
+  }
+  return fallback
+}
+
 export function calculateBookingFee(ridePrice: number): number {
   return Math.ceil(ridePrice * 0.1)
 }
