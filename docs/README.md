@@ -10,6 +10,7 @@ when a feature changes, update its page in the same change.
 | [booking-requests.md](booking-requests.md) | Asking a driver for a seat with your own pickup, drop-off and offer: rules, database, screens |
 | [payments-switch.md](payments-switch.md) | Payments are OFF (free bookings): what that means, and how to turn them on later |
 | [trips-and-seats.md](trips-and-seats.md) | Live trip mode, and how drivers keep the seat count true (seats, "picked up", no-shows) |
+| [privacy-and-consent.md](privacy-and-consent.md) | Agreeing to the Terms/Privacy Policy (recorded), who can see whose location, the private live-location channel |
 | [map-shell.md](map-shell.md) | How the app is built around one persistent map with panels on top |
 | [future-ideas.md](future-ideas.md) | Ideas we have agreed on but not built yet, with enough detail to pick them up later |
 

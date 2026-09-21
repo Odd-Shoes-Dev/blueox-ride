@@ -25,8 +25,10 @@ functions `adjust_ride_seats`, `set_booking_picked_up`, `mark_booking_no_show`.
 
 ## Live trip mode
 
-- The driver taps **Start trip** on their ride. Their position is read continuously, shared with passengers
-  (every 5 seconds, over Supabase Realtime Broadcast — **not stored**), and the screen is kept awake.
+- The driver taps **Start trip** on their ride and confirms "Your location will be shared with passengers on this
+  ride until you end the trip". Their position is then read continuously, shared with passengers (every 5 seconds,
+  over a **private** Supabase Realtime Broadcast channel that only the driver and confirmed passengers can join —
+  **not stored**; see [privacy-and-consent.md](privacy-and-consent.md)), and the screen is kept awake.
 - A **trip bar** on the map shows distance and time left along the route, an off-route warning, arrival, seats
   left, and **End trip**. It stays visible with every panel closed, because the trip runs in the app shell.
 - The driver's marker is a navigation arrow that points the way they are heading (GPS heading, or worked out

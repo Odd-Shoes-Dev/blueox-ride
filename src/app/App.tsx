@@ -28,6 +28,7 @@ import ChurchLandingPage from '@/domains/church/ChurchLandingPage'
 import AdminChurchPayoutsPage from '@/domains/church/AdminChurchPayoutsPage'
 import PrivacyPolicyPage from '@/domains/core/legal/PrivacyPolicyPage'
 import TermsPage from '@/domains/core/legal/TermsPage'
+import { ConsentScreen } from '@/domains/core/legal/ConsentScreen'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -101,7 +102,10 @@ const PANEL_ROUTES: { path: string; title: string; element: React.ReactNode }[] 
 ]
 
 function AppRoutes() {
-  const { loading } = useAuth()
+  const { loading, needsConsent } = useAuth()
+  const { pathname } = useLocation()
+  // The Terms and Privacy Policy stay readable from the consent screen (its links open new tabs)
+  const readingLegalPages = pathname === '/terms' || pathname === '/privacy'
 
   if (loading) {
     return (
@@ -117,6 +121,10 @@ function AppRoutes() {
       </div>
     )
   }
+
+  // Signed in but haven't agreed to the current Terms and Privacy Policy yet (Google sign-ins,
+  // older accounts, or after a material change): nothing else until they do.
+  if (needsConsent && !readingLegalPages) return <ConsentScreen />
 
   return (
     <AppLayout>

@@ -95,6 +95,10 @@ const sections: LegalSection[] = [
             Passwords are stored in hashed form by our authentication provider; we cannot read them.
           </li>
           <li>
+            <strong>Your agreement:</strong> when you agreed to the Terms of Use and this Privacy Policy, and which
+            version, so we can show that you did.
+          </li>
+          <li>
             <strong>Driver details:</strong> vehicle information and photos of your car, and the rides you offer
             (route, departure time, price per seat and number of seats).
           </li>
@@ -119,8 +123,10 @@ const sections: LegalSection[] = [
           </li>
           <li>
             <strong>Live driver location.</strong> If you are a driver and start a trip with location sharing,
-            your position is sent in real time to passengers with a confirmed booking on that ride. It is relayed
-            live and is <strong>not stored</strong> in our database. It stops when you end the trip.
+            your position is sent in real time to passengers with a confirmed booking on that ride. We confirm with
+            you each time you start a trip. It is sent over a private channel that only you and those passengers can
+            join, it is relayed live and is <strong>not stored</strong> in our database. It stops when you end the
+            trip.
           </li>
           <li>
             <strong>Places you search or pick</strong> on the map. The text you type and the map position are sent

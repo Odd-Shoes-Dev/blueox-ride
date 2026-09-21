@@ -27,6 +27,10 @@ export interface User {
   role: UserRole
   average_rating: number | null
   total_rides: number
+  // When they agreed to the Terms and Privacy Policy, and which version. null = not yet.
+  // (Absent altogether until migration 11 has been run.)
+  terms_accepted_at?: string | null
+  terms_version?: string | null
   created_at: string
   updated_at: string
 }

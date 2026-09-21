@@ -16,6 +16,8 @@ There is no automated migration runner in this project — apply each file manua
 | 08 | `08_payments_switch.sql` | Adds the `payments_enabled` setting (OFF by default: bookings are free and confirmed instantly, no fee, no church commission) plus the `book_ride()` and `confirm_pending_booking()` functions. Flip the setting with one UPDATE to bring payments back. |
 | 09 | `09_seat_controls.sql` | Driver seat controls: adjust seats left by hand, tick a passenger as picked up, mark a no-show (frees the seat). Also keeps a ride's Active/Full status in step with its seats, and stops a cancelled booking from re-opening a ride the driver cancelled. |
 | 10 | `10_booking_requests.sql` | Booking requests: `booking_requests` table (realtime), pickup/drop-off/agreed price on bookings, and the `request_booking()`, `withdraw_booking_request()` and `respond_to_booking_request()` functions with the attempt limits. See `docs/booking-requests.md`. |
+| 11 | `11_consent.sql` | Records when each user agreed to the Terms/Privacy Policy and which version (`users.terms_accepted_at`, `terms_version`), stores it from the sign-up trigger, and adds `accept_terms()` for the one-time consent screen. See `docs/privacy-and-consent.md`. |
+| 12 | `12_private_live_location.sql` | Makes the live driver-location channel private: only the ride's driver can send, only the driver and confirmed passengers can listen (rules on `realtime.messages`). **Run before deploying the matching app version.** |
 
 ## Verifying a step worked
 

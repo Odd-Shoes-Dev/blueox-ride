@@ -38,6 +38,8 @@ export default function RideDetailsPage() {
   const [existingBooking, setExistingBooking] = useState<Booking | null>(null)
   const [loading, setLoading] = useState(true)
   const [showBookingDialog, setShowBookingDialog] = useState(false)
+  // Starting a trip shares the driver's position, so it's confirmed each time
+  const [showStartTripNotice, setShowStartTripNotice] = useState(false)
   const [seats, setSeats] = useState(1)
   const [phoneNumber, setPhoneNumber] = useState('')
   const [booking, setBooking] = useState(false)
@@ -481,7 +483,7 @@ export default function RideDetailsPage() {
                 <Button
                   size="sm"
                   variant={isMyTrip ? 'outline' : 'default'}
-                  onClick={() => (isMyTrip ? shell?.stopLiveTrip() : ride && shell?.startDriverTrip(ride))}
+                  onClick={() => (isMyTrip ? shell?.stopLiveTrip() : setShowStartTripNotice(true))}
                   disabled={!shell}
                 >
                   {isMyTrip ? 'End trip' : 'Start trip'}
@@ -805,6 +807,36 @@ export default function RideDetailsPage() {
           </PageContainer>
         </div>
       )}
+
+      {/* Asked every time a driver starts a trip: what it shares, and with whom */}
+      <Dialog open={showStartTripNotice} onOpenChange={setShowStartTripNotice}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Share your live location?</DialogTitle>
+            <DialogDescription>
+              Your location will be shared with passengers on this ride until you end the trip.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="space-y-1.5 text-sm text-muted-foreground list-disc pl-5">
+            <li>Only passengers with a confirmed booking on this ride can see it.</li>
+            <li>It updates every few seconds while the trip runs, and it isn't saved.</li>
+            <li>It stops when you tap End trip or close the app.</li>
+          </ul>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowStartTripNotice(false)}>
+              Not now
+            </Button>
+            <Button
+              onClick={() => {
+                setShowStartTripNotice(false)
+                if (ride) shell?.startDriverTrip(ride)
+              }}
+            >
+              Share and start trip
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Booking Dialog */}
       <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
