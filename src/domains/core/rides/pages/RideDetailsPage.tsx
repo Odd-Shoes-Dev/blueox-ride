@@ -24,7 +24,7 @@ import {
 import { useOptionalMapShell } from '@/domains/core/rides/map/MapShellContext'
 import { usePayments } from '@/shared/contexts/AppSettingsContext'
 import { useRideRouteOnMap, formatDistance, formatDuration } from '@/domains/core/rides/hooks/useRideRouteOnMap'
-import { ArrowLeft, Calendar, Users, Star, Phone, MessageCircle, Clock, Info, Car, Navigation, Loader2 } from 'lucide-react'
+import { ArrowLeft, Calendar, Users, Star, Phone, MessageCircle, Clock, Info, Car, Navigation, Loader2, Pencil } from 'lucide-react'
 
 type RideWithDriver = ridesRepository.RideWithDriverDetail
 
@@ -395,7 +395,18 @@ export default function RideDetailsPage() {
               <ArrowLeft className="w-5 h-5 mr-1" />
               Back
             </button>
-            <h1 className="text-xl font-semibold text-header-foreground">Ride Details</h1>
+            <div className="flex items-center justify-between gap-3">
+              <h1 className="text-xl font-semibold text-header-foreground">Ride Details</h1>
+              {isDriver && ride.status !== 'completed' && (
+                <Link
+                  to={`/rides/${id}/edit`}
+                  className="flex items-center gap-1.5 text-sm font-medium text-header-foreground/90 hover:text-header-foreground"
+                >
+                  <Pencil className="w-4 h-4" />
+                  Edit
+                </Link>
+              )}
+            </div>
           </PageContainer>
         </div>
 
