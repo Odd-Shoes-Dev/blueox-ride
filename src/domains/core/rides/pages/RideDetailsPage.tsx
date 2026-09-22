@@ -43,11 +43,13 @@ export default function RideDetailsPage() {
   const [seats, setSeats] = useState(1)
   const [phoneNumber, setPhoneNumber] = useState('')
   const [booking, setBooking] = useState(false)
-  // Asking the driver instead of booking instantly: the rider's own stops and offer
+  // Every booking is a request to the driver: seats, own stops and an offer
   const [myRequests, setMyRequests] = useState<BookingRequest[]>([]) // this rider's requests on this ride, newest first
   const [pickupStop, setPickupStop] = useState<Stop | null>(null)
   const [dropoffStop, setDropoffStop] = useState<Stop | null>(null)
-  const [showStops, setShowStops] = useState(false)
+  // Whether the "different stops/price" reveal is open — closed by default, since most bookings
+  // use the ride's own start, end and listed price.
+  const [showMore, setShowMore] = useState(false)
   const [offer, setOffer] = useState('') // per seat, as typed
   const { pendingCount, version: requestsVersion } = useBookingRequests()
   // Are bookings charged right now? Off = free: no booking fee, pay the driver directly.
@@ -184,7 +186,7 @@ export default function RideDetailsPage() {
       return
     }
 
-    if (asksDriver && offerNumber <= 0) {
+    if (offerNumber <= 0) {
       toast({ title: 'Enter your offer', description: 'Type how much you can pay per seat.', variant: 'destructive' })
       return
     }
@@ -203,83 +205,35 @@ export default function RideDetailsPage() {
     // Get church attribution if user came from a church landing page
     const churchId = getStoredChurchId()
 
-    // Different stops or a lower offer: ask the driver instead of booking straight away.
-    if (asksDriver) {
-      try {
-        await bookingRequestsRepository.requestBooking({
-          rideId: ride.id,
-          seats,
-          offer: offerNumber,
-          pickup: pickupStop,
-          dropoff: dropoffStop,
-          churchId,
-        })
-      } catch (requestError) {
-        console.error('Request error:', requestError)
-        toast({ title: 'Could not send the request', description: getErrorMessage(requestError), variant: 'destructive' })
-        setBooking(false)
-        return
-      }
-
-      if (!profile?.phone_number && phoneNumber) {
-        await authRepository.updateUserProfile(user.id, { phone_number: phoneNumber })
-      }
-
-      setShowBookingDialog(false)
-      toast({
-        title: 'Request sent',
-        description: "The driver will accept or refuse. You'll be told here as soon as they answer.",
-        variant: 'success',
-      })
-      await refreshMine()
-      setBooking(false)
-      return
-    }
-
-    // Book the seats. The database confirms the booking straight away while payments are
-    // off, or starts it as 'pending payment' with the booking fee while they're on.
-    let bookingId: string
+    // Every booking now goes to the driver to accept — there's no path that confirms
+    // straight away, so a seat is never taken without the driver having seen who it is.
     try {
-      bookingId = await bookingsRepository.bookRide({
+      await bookingRequestsRepository.requestBooking({
         rideId: ride.id,
         seats,
-        churchId, // Will be null if user didn't come from a church page
+        offer: offerNumber,
+        pickup: pickupStop,
+        dropoff: dropoffStop,
+        churchId,
       })
-    } catch (bookingError) {
-      console.error('Booking error:', bookingError)
-      toast({
-        title: 'Booking failed',
-        description: getErrorMessage(bookingError),
-        variant: 'destructive',
-      })
+    } catch (requestError) {
+      console.error('Request error:', requestError)
+      toast({ title: 'Could not send the request', description: getErrorMessage(requestError), variant: 'destructive' })
       setBooking(false)
       return
     }
 
-    // Save phone number to profile if not already set
     if (!profile?.phone_number && phoneNumber) {
       await authRepository.updateUserProfile(user.id, { phone_number: phoneNumber })
     }
 
     setShowBookingDialog(false)
-
-    if (paymentsEnabled) {
-      toast({
-        title: 'Booking created!',
-        description: 'Please complete payment to confirm your seat.',
-        variant: 'success',
-      })
-      navigate(`/bookings/${bookingId}/pay`, { state: { phone: phoneNumber } })
-    } else {
-      // Nothing to pay: the seat is booked. Stay here and show the confirmed booking.
-      toast({
-        title: 'Seat booked!',
-        description: "You're confirmed. Contact the driver to arrange your pickup.",
-        variant: 'success',
-      })
-      await fetchRide()
-    }
-
+    toast({
+      title: 'Request sent',
+      description: "The driver will accept or refuse. You'll be told here as soon as they answer.",
+      variant: 'success',
+    })
+    await refreshMine()
     setBooking(false)
   }
 
@@ -350,9 +304,9 @@ export default function RideDetailsPage() {
   if (!ride) return null
 
   // With payments off there is no fee: the passenger pays the driver the whole price in cash.
+  // (Used for an already-accepted booking's payment status below — a request being sent doesn't
+  // charge anything yet, that only applies once the driver accepts.)
   const bookingFee = paymentsEnabled ? calculateBookingFee(ride.price) : 0
-  const totalBookingFee = bookingFee * seats
-  const cashPayment = (ride.price - bookingFee) * seats
 
   const isPastRide = new Date(ride.departure_time) < new Date()
 
@@ -362,9 +316,7 @@ export default function RideDetailsPage() {
   const attemptsLeft = MAX_REQUEST_ATTEMPTS - myRequests.length
   const blockedByDriver = myRequests.some((r) => r.blocked)
 
-  // An offer below the listed price, or their own pickup/drop-off, goes to the driver as a request.
   const offerNumber = parseInt(offer) || 0
-  const asksDriver = !!(pickupStop || dropoffStop) || (offerNumber > 0 && offerNumber < ride.price)
 
   const rideIsBookable =
     !existingBooking &&
@@ -775,15 +727,16 @@ export default function RideDetailsPage() {
                   <p className="font-medium mb-1">How booking works</p>
                   {paymentsEnabled ? (
                     <ul className="space-y-1">
-                      <li>1. Pay 10% booking fee ({formatCurrency(bookingFee)}/seat) via mobile money</li>
-                      <li>2. Get driver's contact after payment</li>
-                      <li>3. Pay remaining 90% ({formatCurrency(ride.price - bookingFee)}/seat) in cash to driver</li>
+                      <li>1. Send a request with your seats, stops and offer</li>
+                      <li>2. The driver accepts or refuses</li>
+                      <li>3. Once accepted, pay 10% ({formatCurrency(bookingFee)}/seat) via mobile money</li>
+                      <li>4. Pay the remaining 90% ({formatCurrency(ride.price - bookingFee)}/seat) in cash to driver</li>
                     </ul>
                   ) : (
                     <ul className="space-y-1">
-                      <li>1. Book your seat — it's free</li>
-                      <li>2. Get the driver's contact straight away</li>
-                      <li>3. Pay the driver {formatCurrency(ride.price)}/seat in cash after the ride</li>
+                      <li>1. Send a request with your seats, stops and offer — it's free</li>
+                      <li>2. The driver accepts or refuses</li>
+                      <li>3. Once accepted, get their contact and pay {formatCurrency(ride.price)}/seat in cash after the ride</li>
                     </ul>
                   )}
                 </div>
@@ -798,7 +751,7 @@ export default function RideDetailsPage() {
         <div className="sticky bottom-0 p-4 bg-background border-t z-40">
           <PageContainer>
             <Button className="w-full" size="lg" onClick={() => setShowBookingDialog(true)}>
-              {paymentsEnabled ? `Book Seat - ${formatCurrency(bookingFee)} to reserve` : 'Book Seat — free'}
+              Request to Book
             </Button>
           </PageContainer>
         </div>
@@ -813,7 +766,7 @@ export default function RideDetailsPage() {
               size="lg"
               onClick={() => navigate('/login', { state: { from: `/rides/${id}` } })}
             >
-              {paymentsEnabled ? `Sign In to Book - ${formatCurrency(bookingFee)} to reserve` : 'Sign In to Book — free'}
+              Sign In to Request a Seat
             </Button>
           </PageContainer>
         </div>
@@ -853,13 +806,9 @@ export default function RideDetailsPage() {
       <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{asksDriver ? 'Ask the Driver' : 'Book Your Seat'}</DialogTitle>
+            <DialogTitle>Ask the Driver</DialogTitle>
             <DialogDescription>
-              {asksDriver
-                ? "Your request goes to the driver, who accepts or refuses. You'll be told as soon as they answer."
-                : paymentsEnabled
-                ? `Pay ${formatCurrency(bookingFee)} per seat to reserve. You'll pay the remaining ${formatCurrency(ride.price - bookingFee)} per seat in cash to the driver.`
-                : `Booking is free. You'll pay the driver ${formatCurrency(ride.price)} per seat in cash after the ride.`}
+              Your request goes to the driver, who accepts or refuses. You'll be told here as soon as they answer.
             </DialogDescription>
           </DialogHeader>
 
@@ -879,16 +828,17 @@ export default function RideDetailsPage() {
               </p>
             </div>
 
-            {/* Own stops along the way, and an offer */}
+            {/* Closed by default, like a login card's "Forgot password?" — most people send the
+                ride's own stops at the listed price and never need to open this. */}
             <div className="space-y-3">
               <button
                 type="button"
                 className="text-sm text-primary underline"
-                onClick={() => setShowStops((current) => !current)}
+                onClick={() => setShowMore((current) => !current)}
               >
-                {showStops ? "Use the ride's own start and end" : 'Get in or off somewhere else along the way?'}
+                {showMore ? "Use the ride's own stops and price" : 'Want a different pickup, drop-off or price?'}
               </button>
-              {showStops && (
+              {showMore && (
                 <div className="space-y-3">
                   <div className="space-y-1.5">
                     <Label>Where will you get in?</Label>
@@ -916,25 +866,23 @@ export default function RideDetailsPage() {
                       the listed {formatCurrency(ride.price)}. It's only a guide.
                     </p>
                   )}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="offer">What you can pay per seat (UGX)</Label>
+                    <Input
+                      id="offer"
+                      type="number"
+                      min={500}
+                      step={500}
+                      value={offer}
+                      onChange={(e) => setOffer(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Listed price: {formatCurrency(ride.price)}
+                      {lastRequest?.status === 'declined' ? ` · attempt ${myRequests.length + 1} of ${MAX_REQUEST_ATTEMPTS}` : ''}.
+                    </p>
+                  </div>
                 </div>
               )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="offer">What you can pay per seat (UGX)</Label>
-              <Input
-                id="offer"
-                type="number"
-                min={500}
-                step={500}
-                value={offer}
-                onChange={(e) => setOffer(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Listed price: {formatCurrency(ride.price)}. Offering less, or choosing your own stops, sends the driver a request to
-                accept or refuse
-                {lastRequest?.status === 'declined' ? ` (attempt ${myRequests.length + 1} of ${MAX_REQUEST_ATTEMPTS})` : ''}.
-              </p>
             </div>
 
             <div className="space-y-2">
@@ -954,26 +902,12 @@ export default function RideDetailsPage() {
             </div>
 
             <div className="p-4 bg-muted rounded-lg space-y-2">
-              {asksDriver && (
-                <div className="flex justify-between text-sm">
-                  <span>You offer ({seats} seat{seats > 1 ? 's' : ''})</span>
-                  <span className="font-medium">{formatCurrency(offerNumber * seats)}</span>
-                </div>
-              )}
-              {!asksDriver && paymentsEnabled && (
-                <div className="flex justify-between text-sm">
-                  <span>Booking fee ({seats} seat{seats > 1 ? 's' : ''})</span>
-                  <span className="font-medium">{formatCurrency(totalBookingFee)}</span>
-                </div>
-              )}
-              {!asksDriver && (
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Pay driver in cash</span>
-                  <span>{formatCurrency(cashPayment)}</span>
-                </div>
-              )}
+              <div className="flex justify-between text-sm">
+                <span>You offer ({seats} seat{seats > 1 ? 's' : ''})</span>
+                <span className="font-medium">{formatCurrency(offerNumber * seats)}</span>
+              </div>
               <div className="flex justify-between font-medium pt-2 border-t">
-                <span>{asksDriver ? 'Listed price for comparison' : 'Total ride cost'}</span>
+                <span>Listed price for comparison</span>
                 <span>{formatCurrency(ride.price * seats)}</span>
               </div>
             </div>
@@ -984,7 +918,7 @@ export default function RideDetailsPage() {
               Cancel
             </Button>
             <Button onClick={handleBook} loading={booking}>
-              {asksDriver ? 'Send request' : paymentsEnabled ? `Pay ${formatCurrency(totalBookingFee)}` : 'Book seat — free'}
+              Send request
             </Button>
           </DialogFooter>
           </DialogContent>

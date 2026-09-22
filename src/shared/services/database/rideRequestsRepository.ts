@@ -27,10 +27,13 @@ export async function createRideRequest(
   return data as RideRequest
 }
 
+// Open requests are for signed-in users only (migration 14). The passenger join is deliberately
+// narrow — a name and photo are enough for browsing; phone and email are only ever shared once
+// a driver actually accepts, the same as for any other booking.
 export async function getOpenRideRequests(): Promise<RideRequest[]> {
   const { data, error } = await supabase
     .from('ride_requests')
-    .select('*, passenger:users(*)')
+    .select('*, passenger:users(id, full_name, avatar_url, average_rating, total_rides)')
     .eq('status', 'open')
     .gt('departure_time', new Date().toISOString())
     .order('departure_time', { ascending: true })

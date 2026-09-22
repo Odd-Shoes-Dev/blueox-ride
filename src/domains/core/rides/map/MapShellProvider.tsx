@@ -9,6 +9,7 @@ import { haversineKm } from '@/domains/core/rides/lib/routeProgress'
 import { DEFAULT_SEARCH_RADIUS_KM } from '@/domains/core/rides/map/searchConstants'
 import type { PinKind } from '@/domains/core/rides/components/mapPins'
 import type { PlacedPoint } from '@/domains/core/rides/components/PinPlacer'
+import type { RideRequest } from '@/shared/types'
 import {
   MapShellContext,
   type FeaturedRoute,
@@ -345,6 +346,10 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
 
   // ---- Pins from panel pages, place-search focus, map centre ----
   const [panelPins, setPanelPins] = useState<PanelPins | null>(null)
+  // ---- Open ride requests shown on the map while the Ride Requests page is open ----
+  const [requestPins, setRequestPins] = useState<RideRequest[] | null>(null)
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
+  const selectRequest = useCallback((requestId: string | null) => setSelectedRequestId(requestId), [])
   const [focus, setFocus] = useState<{ lat: number; lng: number } | null>(null)
   const focusOn = useCallback((lat: number, lng: number) => setFocus({ lat, lng }), [])
   const mapCenterRef = useRef<{ lat: number; lng: number } | null>(null)
@@ -389,6 +394,10 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
       finishPin,
       panelPins,
       setPanelPins,
+      requestPins,
+      setRequestPins,
+      selectedRequestId,
+      selectRequest,
       liveTrip: live.liveTrip,
       livePosition: live.livePosition,
       liveError: live.liveError,
@@ -434,6 +443,9 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
       requestPin,
       finishPin,
       panelPins,
+      requestPins,
+      selectedRequestId,
+      selectRequest,
       live.liveTrip,
       live.livePosition,
       live.liveError,

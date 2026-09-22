@@ -19,10 +19,24 @@ interface HeroRide {
   price: number
 }
 
+interface HeroRideRequest {
+  id: string
+  origin_name: string
+  destination_name: string
+  origin_lat: number
+  origin_lng: number
+  budget: number
+  seats_needed: number
+}
+
 interface HeroLiveMapProps {
   rides: HeroRide[]
   // The signed-in driver's own upcoming rides: shown with a different marker
   myRides?: HeroRide[]
+  // Open ride requests (people who want a ride, not drivers offering one), shown while the
+  // Ride Requests page is open. Tapping one calls onSelectRequest with its id.
+  requests?: HeroRideRequest[]
+  onSelectRequest?: (requestId: string) => void
   // A ride's road route (own next ride, or the pin the user tapped) with its end pin
   featured?: {
     rideId: string
@@ -91,6 +105,24 @@ const myRideIcon = L.divIcon({
   "><span style="transform: rotate(45deg); color: white; font-size: 13px; line-height: 1;">★</span></div>`,
   iconSize: [26, 26],
   iconAnchor: [13, 26],
+})
+
+// An open ride request: hollow, dashed and amber, so it reads as "wanted" rather than
+// "offered" (rideIcon is a solid coral pin) at a glance.
+const requestIcon = L.divIcon({
+  className: 'hero-request-marker',
+  html: `<div style="
+    width: 22px;
+    height: 22px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    background: white;
+    border: 2.5px dashed #D97706;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+  "><span style="transform: rotate(45deg); color: #D97706; font-size: 12px; font-weight: 700; line-height: 1;">?</span></div>`,
+  iconSize: [22, 22],
+  iconAnchor: [11, 22],
 })
 
 // The two ends of a previewed ride's route. Small dots, so they don't get confused with the
@@ -396,6 +428,24 @@ function RidePopup({
   )
 }
 
+// Popup for an open-request pin: where they want to go, their budget, and an Accept button
+// that hands off to the caller (RideRequestsPage owns the actual accept dialog/flow).
+function RideRequestPopup({ request, onAccept }: { request: HeroRideRequest; onAccept: () => void }) {
+  return (
+    <div className="text-sm">
+      <p className="text-xs font-semibold uppercase tracking-wide text-amber-600 mb-1">Wants a ride</p>
+      <p className="font-medium">{request.origin_name}</p>
+      <p className="text-muted-foreground mb-1">to {request.destination_name}</p>
+      <p className="text-muted-foreground mb-2">
+        {formatCurrency(request.budget)}/seat · {request.seats_needed} seat{request.seats_needed !== 1 ? 's' : ''}
+      </p>
+      <Button size="sm" className="w-full" onClick={onAccept}>
+        Accept
+      </Button>
+    </div>
+  )
+}
+
 // A real, fully interactive map used as hero backdrop — shows the visitor's
 // location (if granted) and nearby active rides at a glance. The header
 // (logo, sign-in) and the search card render in a layer above this map
@@ -405,6 +455,8 @@ function RidePopup({
 export function HeroLiveMap({
   rides,
   myRides = [],
+  requests = [],
+  onSelectRequest,
   featured = null,
   onSelectRide,
   onDeselectRide,
@@ -722,6 +774,22 @@ export function HeroLiveMap({
             </Popup>
           </Marker>
         ))}
+
+        {requests
+          .filter((request) => request.origin_lat && request.origin_lng)
+          .map((request) => (
+            <Marker
+              key={`req-${request.id}`}
+              position={[request.origin_lat, request.origin_lng]}
+              icon={requestIcon}
+              opacity={editingKind ? 0.35 : 1}
+              zIndexOffset={600}
+            >
+              <Popup>
+                <RideRequestPopup request={request} onAccept={() => onSelectRequest?.(request.id)} />
+              </Popup>
+            </Marker>
+          ))}
       </MapContainer>
 
       {editing && map && (

@@ -78,12 +78,19 @@ export default function HomePage({
 
   // Show drivers a concrete demand signal ("N riders waiting") instead of a
   // generic "check for requests" link — value visible immediately, no click required.
+  // Open requests are only readable once signed in (migration 14), so a guest would
+  // otherwise always see "0" here, which would misreport there being none at all.
   useEffect(() => {
+    if (!user) {
+      // Deferred (not called synchronously in the effect body) per the project's lint rule.
+      const timer = setTimeout(() => setOpenRequestCount(null), 0)
+      return () => clearTimeout(timer)
+    }
     rideRequestsRepository
       .getOpenRideRequests()
       .then((requests) => setOpenRequestCount(requests.length))
       .catch(() => setOpenRequestCount(null))
-  }, [])
+  }, [user])
 
   return (
     <>

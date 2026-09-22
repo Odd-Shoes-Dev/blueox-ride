@@ -13,26 +13,11 @@ export async function getActiveBookingForRide(rideId: string, passengerId: strin
   return (data as Booking) ?? null
 }
 
-export interface BookRideParams {
-  rideId: string
-  seats: number
-  churchId: string | null
-}
-
-// Book seats on a ride. The database does the whole thing in one step (checks the ride and
-// seats, works out the fee): while payments are off the booking is free and confirmed at
-// once; while they're on it starts as 'pending_payment' with the booking fee. Returns the
-// new booking's id.
-export async function bookRide(params: BookRideParams): Promise<string> {
-  const { data, error } = await supabase.rpc('book_ride', {
-    p_ride_id: params.rideId,
-    p_seats: params.seats,
-    p_church_id: params.churchId,
-  })
-
-  if (error) throw error
-  return data as string
-}
+// There used to be an instant-booking path here (book_ride, migration 08). Since migration 15
+// every booking goes through bookingRequestsRepository.requestBooking() instead — the driver
+// always accepts before a booking exists — so this no longer has a client. The database
+// function itself is left in place (harmless) but its EXECUTE grant was revoked, so calling it
+// directly would fail the same way going through the app does.
 
 // Confirm a booking that was left unpaid from before payments were switched off.
 export async function confirmPendingBooking(bookingId: string): Promise<void> {

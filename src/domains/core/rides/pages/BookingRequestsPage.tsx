@@ -51,8 +51,9 @@ function stopsOf(request: BookingRequestWithDetails) {
 
 const REASONS: DeclineReason[] = ['offer_too_low', 'pickup_too_far', 'seats_reserved', 'other']
 
-// Booking requests: what drivers answer, and what riders sent. A request is a rider asking for
-// a seat with their own pickup / drop-off and their own offer instead of booking instantly.
+// Booking requests: what drivers answer, and what riders sent. Every booking is a request —
+// seats, pickup/drop-off and an offer — that the driver accepts or refuses; nothing is ever
+// confirmed automatically. See docs/booking-requests.md.
 export default function BookingRequestsPage() {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -158,7 +159,9 @@ export default function BookingRequestsPage() {
     refresh()
   }
 
-  const waitingForMe = forMe.filter(isWaiting)
+  // Highest offer first — a driver can hold several requests for the same seats at once now
+  // (there's no more instant, first-come-first-served booking), so put the best one up top.
+  const waitingForMe = forMe.filter(isWaiting).sort((a, b) => b.offer_price - a.offer_price)
   const answeredForMe = forMe.filter((request) => !isWaiting(request))
 
   return (

@@ -1,5 +1,8 @@
 # Editing and cancelling a ride
 
+See also [ride-requests.md](ride-requests.md) for `14_ride_request_visibility.sql`, added in the
+same batch of changes — restricting who can browse open ride requests.
+
 Needs migration [`13_ride_editing.sql`](../supabase/migrations/13_ride_editing.sql).
 
 ## What a driver can do to their own ride
