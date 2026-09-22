@@ -16,6 +16,7 @@ import LoginPage from '@/domains/core/auth/LoginPage'
 import RegisterPage from '@/domains/core/auth/RegisterPage'
 import ProfilePage from '@/domains/core/profile/ProfilePage'
 import CreateRidePage from '@/domains/core/rides/pages/CreateRidePage'
+import EditRidePage from '@/domains/core/rides/pages/EditRidePage'
 import RideDetailsPage from '@/domains/core/rides/pages/RideDetailsPage'
 import PaymentPage from '@/domains/core/payments/PaymentPage'
 import MyRidesPage from '@/domains/core/rides/pages/MyRidesPage'
@@ -95,6 +96,7 @@ const PANEL_ROUTES: { path: string; title: string; element: React.ReactNode }[] 
   { path: '/rides/:id', title: 'Ride details', element: <RideDetailsPage /> },
   { path: '/requests', title: 'Ride requests', element: <RideRequestsPage /> },
   { path: '/rides/create', title: 'Offer a ride', element: <ProtectedRoute><CreateRidePage /></ProtectedRoute> },
+  { path: '/rides/:id/edit', title: 'Edit ride', element: <ProtectedRoute><EditRidePage /></ProtectedRoute> },
   { path: '/requests/new', title: 'Request a ride', element: <ProtectedRoute><RequestRidePage /></ProtectedRoute> },
   { path: '/booking-requests', title: 'Booking requests', element: <ProtectedRoute><BookingRequestsPage /></ProtectedRoute> },
   { path: '/my-rides', title: 'My rides', element: <ProtectedRoute><MyRidesPage /></ProtectedRoute> },

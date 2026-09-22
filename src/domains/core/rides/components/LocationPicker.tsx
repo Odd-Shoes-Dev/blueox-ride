@@ -49,6 +49,9 @@ export function LocationPicker({
   const [showDropdown, setShowDropdown] = useState(false)
   const [showMapPicker, setShowMapPicker] = useState(false)
   const [gettingLocation, setGettingLocation] = useState(false)
+  // Set on blur so a typed-but-not-picked address (see handleKeyDown) gets a hint instead of
+  // silently failing later at submit — but not while still typing, or it'd nag every keystroke.
+  const [blurred, setBlurred] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -126,6 +129,7 @@ export function LocationPicker({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
     setInput(newValue)
+    setBlurred(false)
 
     if (value) {
       onChange(null)
@@ -138,6 +142,16 @@ export function LocationPicker({
     debounceRef.current = setTimeout(() => {
       fetchSuggestions(newValue)
     }, 400)
+  }
+
+  // This field sits inside a form with a submit button, so pressing Enter after typing (rather
+  // than tapping a suggestion) would otherwise submit the whole form with this field looking
+  // filled in but not actually holding a location — the exact "I picked it but it says missing"
+  // report this fixes. Enter here always picks the top suggestion instead, never submits.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    if (suggestions.length > 0) handleSelectPlace(suggestions[0])
   }
 
   // Handle place selection
@@ -194,7 +208,12 @@ export function LocationPicker({
             <Input
               value={input}
               onChange={handleInputChange}
-              onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => {
+                setBlurred(false)
+                suggestions.length > 0 && setShowDropdown(true)
+              }}
+              onBlur={() => setBlurred(true)}
               placeholder={placeholder}
               className={cn('pl-10 pr-10', glass && glassInput)}
             />
@@ -243,6 +262,15 @@ export function LocationPicker({
             <Map className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Typed text that was never actually picked (e.g. Enter pressed with no suggestion
+            chosen, or the field left before one loaded) — this is what silently fails at submit
+            otherwise, so flag it here instead. */}
+        {blurred && !loading && !showDropdown && input.trim().length > 0 && !value && (
+          <p className={cn('mt-1 text-xs px-1', glass ? 'text-navy-900/70' : 'text-muted-foreground')}>
+            Pick "{input.trim()}" from the list, or use the pin or map button, to set this location.
+          </p>
+        )}
 
         {/* Suggestions dropdown */}
         {showDropdown && suggestions.length > 0 && (

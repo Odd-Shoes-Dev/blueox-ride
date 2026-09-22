@@ -23,7 +23,7 @@ import { useToast } from '@/shared/hooks/use-toast'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { ReviewDialog } from '@/domains/core/rides/components/ReviewDialog'
 import { formatCurrency, formatDate } from '@/shared/lib/utils'
-import { Calendar, Users, Plus, X, Phone, MessageCircle, Wallet, Star, CheckCircle, ArrowRight, Check, Minus } from 'lucide-react'
+import { Calendar, Users, Plus, X, Phone, MessageCircle, Wallet, Star, CheckCircle, ArrowRight, Check, Minus, Pencil } from 'lucide-react'
 import type { RideRequest } from '@/shared/types'
 
 type RideWithBookings = ridesRepository.RideWithBookings
@@ -742,12 +742,22 @@ export default function MyRidesPage() {
                           </div>
                         </div>
                       )}
-                      <Button asChild variant="outline" size="sm" className="w-full mt-3">
-                        <Link to={`/rides/${ride.id}`}>
-                          Open details
-                          <ArrowRight className="w-4 h-4 ml-1.5" />
-                        </Link>
-                      </Button>
+                      <div className="flex gap-2 mt-3">
+                        <Button asChild variant="outline" size="sm" className="flex-1">
+                          <Link to={`/rides/${ride.id}`}>
+                            Open details
+                            <ArrowRight className="w-4 h-4 ml-1.5" />
+                          </Link>
+                        </Button>
+                        {ride.status !== 'completed' && (
+                          <Button asChild variant="outline" size="sm" className="flex-1">
+                            <Link to={`/rides/${ride.id}/edit`}>
+                              <Pencil className="w-4 h-4 mr-1.5" />
+                              Edit
+                            </Link>
+                          </Button>
+                        )}
+                      </div>
 
                       {/* Passengers */}
                       {ride.bookings.filter(b => b.status === 'confirmed').length > 0 && (

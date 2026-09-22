@@ -194,6 +194,61 @@ export interface RideWithBookings extends Ride {
   bookings: (Booking & { passenger: User })[]
 }
 
+export interface RideForEdit extends Ride {
+  // Whether the ride can be edited in full. False once it has a live booking or the driver has
+  // already adjusted its seats — matched by the database trigger that enforces this
+  // (guard_ride_edit, migration 13), so this is only ever a prediction of what the server will
+  // accept, not the source of truth.
+  fullyEditable: boolean
+}
+
+export async function getRideForEdit(rideId: string): Promise<RideForEdit | null> {
+  const { data: ride, error } = await supabase.from('rides').select('*').eq('id', rideId).single()
+  if (error) {
+    if (error.code === 'PGRST116') return null
+    throw error
+  }
+
+  const { count, error: countError } = await supabase
+    .from('bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('ride_id', rideId)
+    .neq('status', 'cancelled')
+  if (countError) throw countError
+
+  const untouched = (ride as Ride).available_seats === (ride as Ride).total_seats
+  return { ...(ride as Ride), fullyEditable: untouched && (count ?? 0) === 0 }
+}
+
+export interface RideEditRequest {
+  origin_name: string
+  origin_lat: number
+  origin_lng: number
+  destination_name: string
+  destination_lat: number
+  destination_lng: number
+  departure_time: string
+  price: number
+  total_seats: number
+  notes?: string | null
+  car_brand?: string | null
+  car_model?: string | null
+  car_year?: number | null
+  car_photo_id?: string | null
+}
+
+type AlwaysEditableRideFields = 'notes' | 'car_brand' | 'car_model' | 'car_year' | 'car_photo_id'
+
+// Notes and car details always go through; the rest is only accepted by the database
+// (guard_ride_edit) while nothing has taken a seat on the ride yet — see getRideForEdit.
+export async function updateRide(
+  rideId: string,
+  updates: RideEditRequest | Pick<RideEditRequest, AlwaysEditableRideFields>
+): Promise<{ error: Error | null }> {
+  const { error } = await supabase.from('rides').update(updates).eq('id', rideId)
+  return { error: error as Error | null }
+}
+
 export async function getRidesForDriver(driverId: string): Promise<RideWithBookings[]> {
   const { data, error } = await supabase
     .from('rides')
