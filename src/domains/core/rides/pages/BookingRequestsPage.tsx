@@ -170,7 +170,7 @@ export default function BookingRequestsPage() {
         <PageContainer>
           <h1 className="text-xl font-semibold text-header-foreground">Booking requests</h1>
           <p className="text-header-foreground/80 text-sm mt-1">
-            Riders asking for a seat with their own pickup, drop-off and offer.
+            Bookings on your rides, and requests you've sent to other drivers.
           </p>
         </PageContainer>
       </div>
@@ -196,7 +196,7 @@ export default function BookingRequestsPage() {
                   <CardContent className="p-8 text-center">
                     <p className="text-muted-foreground">No requests waiting</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      When a rider asks for a seat with their own stops or offer, it shows up here.
+                      When someone tries to book a seat on one of your rides, it shows up here.
                     </p>
                   </CardContent>
                 </Card>
@@ -341,7 +341,7 @@ export default function BookingRequestsPage() {
                   <CardContent className="p-8 text-center">
                     <p className="text-muted-foreground">You haven't sent any requests</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Open a ride and choose your own pickup, drop-off or offer to ask the driver.
+                      Open a ride and tap Request to Book — it always goes to the driver first.
                     </p>
                   </CardContent>
                 </Card>

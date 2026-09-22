@@ -159,7 +159,9 @@ export default function CreateRidePage() {
         variant: 'success',
       })
       shell?.refreshMyRides() // so the new ride appears on the home map
-      navigate(`/rides/${ride.id}`)
+      // Replaces the now-published form in history, so Back from the ride skips straight
+      // past it to wherever "Offer a Ride" was opened from.
+      navigate(`/rides/${ride.id}`, { replace: true })
     } catch (error) {
       console.error('Create ride error:', error)
       toast({

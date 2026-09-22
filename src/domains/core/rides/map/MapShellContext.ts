@@ -55,6 +55,11 @@ export interface SearchResults {
   destination: PlacedPoint | null
   radiusKm: number
   date?: string
+  // The earliest and latest departure date among matching rides across ALL dates (computed the
+  // last time a search ran with no date filter, then kept as-is while narrowing to one date) —
+  // what the "Leaving on" field's min/max are bounded to, so it can't be pointed at a day this
+  // route has no ride on. Null when there are no matching rides at all to bound it by.
+  dateBounds: { min: string; max: string } | null
   // Changes with every search, so the map knows to re-fit itself
   token: number
 }

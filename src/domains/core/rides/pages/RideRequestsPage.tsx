@@ -98,7 +98,9 @@ export default function RideRequestsPage() {
         variant: 'success',
       })
       setAcceptTarget(null)
-      navigate(`/rides/${rideId}`)
+      // Replaces this browsing list in history, so Back from the new ride skips past it
+      // rather than returning to a request that's already been accepted and is gone.
+      navigate(`/rides/${rideId}`, { replace: true })
     } catch (error) {
       console.error('Accept request error:', error)
       toast({

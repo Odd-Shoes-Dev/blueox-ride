@@ -116,3 +116,18 @@ share, with their first name and distance, so roadside pickups are easy.
   Policy and the consent screen.
 - The passenger's browser also asks for location permission, and the tab must stay open with the screen on, so it is
   most useful in the minutes before pickup.
+
+---
+
+## 12. Grey out individual days with no ride in the search date picker
+
+**Status:** not started. Follow-up to the "Leaving on" date bounds on the search results page (see
+[map-shell.md](map-shell.md), already built): the plain browser `<input type="date">` used there can only
+enforce one continuous min–max range, so a
+route with rides on, say, the 23rd and the 26th but nothing between still lets someone pick the 24th or 25th —
+they'd just land on "No rides found," same as before the bounds existed, only now it can't happen outside that
+range at all.
+
+**The idea.** Replace the plain date field with a small custom calendar component (a real UI piece, not a tweak)
+that only shows days with at least one matching ride as selectable, greying out the rest — so every day it's
+possible to pick is guaranteed to show something.

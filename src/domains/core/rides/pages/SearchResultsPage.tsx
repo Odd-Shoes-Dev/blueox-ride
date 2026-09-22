@@ -9,6 +9,9 @@ import { RideCard } from '@/domains/core/rides/components/RideCard'
 import { useMapShell } from '@/domains/core/rides/map/MapShellContext'
 import { formatDistance } from '@/domains/core/rides/hooks/useRideRouteOnMap'
 import { WIDE_SEARCH_RADIUS_KM } from '@/domains/core/rides/map/searchConstants'
+import { toLocalDateInput } from '@/shared/lib/utils'
+
+const maxDate = (a: string, b: string) => (a > b ? a : b)
 
 // What "Find a Ride" on the home screen leads to: rides that start near the pickup and
 // end near the destination — matched by distance, so it works even when place names
@@ -18,6 +21,7 @@ export default function SearchResultsPage() {
   const shell = useMapShell()
   const navigate = useNavigate()
   const results = shell.results
+  const todayInput = toLocalDateInput(new Date())
 
   return (
     <div className="min-h-full bg-background pb-8">
@@ -58,7 +62,11 @@ export default function SearchResultsPage() {
                         id="results-date"
                         type="date"
                         value={results.date ?? ''}
-                        min={new Date().toISOString().split('T')[0]}
+                        // Bounded to when rides on this route actually run (today at the earliest
+                        // either way), so it can't be pointed at a day nothing could ever match.
+                        min={results.dateBounds ? maxDate(todayInput, results.dateBounds.min) : todayInput}
+                        max={results.dateBounds?.max}
+                        disabled={!results.dateBounds}
                         onChange={(e) => shell.searchRides({ date: e.target.value || undefined, radiusKm: results.radiusKm })}
                       />
                       {results.date && (
@@ -71,6 +79,9 @@ export default function SearchResultsPage() {
                         </Button>
                       )}
                     </div>
+                    {!results.dateBounds && (
+                      <p className="text-xs text-muted-foreground">No rides currently run on this route.</p>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Showing rides that start within {results.radiusKm} km of your pickup and end within {results.radiusKm} km of your

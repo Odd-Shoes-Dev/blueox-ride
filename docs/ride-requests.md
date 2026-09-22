@@ -23,8 +23,11 @@ open list. There's no per-driver targeting or "only drivers on this route" filte
 ## Where a driver finds them
 
 - **Ride Requests** (`/requests`): the full list, with route, date, seats, budget and an Accept
-  button. The home screen's "Ride Requests" card shows a live count ("N riders waiting for a
-  driver") for signed-in users, so the demand is visible without a click.
+  button. Two entry points, both with a live count ("N want a ride") for signed-in users, so the
+  demand is visible without a click: the home screen's Quick Actions card (below the map, one of
+  three), and a button next to "Offer a Ride" at the top of My Rides' Driving tab — the shorter,
+  more reachable path, since checking your own rides is already a driver's mindset. Both read the
+  same count via `useOpenRequestCount()`.
 - **On the map**, while the Ride Requests page is open: each open request shows as its own pin at
   its pickup point — hollow, dashed and amber, to read as "wanted" rather than "offered" next to
   the solid pins of posted rides. Tapping one opens the same Accept dialog as tapping its card.

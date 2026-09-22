@@ -19,11 +19,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useOptionalMapShell, type PreviewableRide } from '@/domains/core/rides/map/MapShellContext'
 import { usePayments } from '@/shared/contexts/AppSettingsContext'
 import { useBookingRequests } from '@/domains/core/rides/requests/BookingRequestsContext'
+import { useOpenRequestCount } from '@/domains/core/rides/hooks/useOpenRequestCount'
 import { useToast } from '@/shared/hooks/use-toast'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { ReviewDialog } from '@/domains/core/rides/components/ReviewDialog'
 import { formatCurrency, formatDate } from '@/shared/lib/utils'
-import { Calendar, Users, Plus, X, Phone, MessageCircle, Wallet, Star, CheckCircle, ArrowRight, Check, Minus, Pencil } from 'lucide-react'
+import { Calendar, Users, Plus, X, Phone, MessageCircle, Wallet, Star, CheckCircle, ArrowRight, Check, Minus, Pencil, MessageSquare } from 'lucide-react'
 import type { RideRequest } from '@/shared/types'
 
 type RideWithBookings = ridesRepository.RideWithBookings
@@ -38,6 +39,10 @@ export default function MyRidesPage() {
   const { paymentsEnabled } = usePayments()
   // Riders asking this driver for a seat (with their own stops / offer), waiting for an answer
   const { pendingCount: waitingRequests } = useBookingRequests()
+  // "People who need a ride" — shown as a second, easier-to-reach way into /requests than the
+  // home screen's quick-action card, since a driver checking their own rides is exactly the
+  // moment "also browse who wants one" fits.
+  const openRequestCount = useOpenRequestCount()
 
   // Tapping a card (but not the buttons/links inside it) shows that ride's route on
   // the map behind the panel; tapping it again hides it.
@@ -657,13 +662,18 @@ export default function MyRidesPage() {
 
             {/* My Rides (Driving) Tab */}
             <TabsContent value="driving" className="mt-4">
-              <Button
-                className="w-full mb-4"
-                onClick={() => navigate('/rides/create')}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Offer a Ride
-              </Button>
+              <div className="flex gap-2 mb-4">
+                <Button className="flex-1" onClick={() => navigate('/rides/create')}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Offer a Ride
+                </Button>
+                <Button asChild variant="outline" className="flex-1">
+                  <Link to="/requests">
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    {openRequestCount ? `${openRequestCount} want a ride` : 'Ride requests'}
+                  </Link>
+                </Button>
+              </div>
 
               {myRides.length === 0 ? (
                 <Card>

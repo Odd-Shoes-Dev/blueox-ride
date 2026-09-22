@@ -256,7 +256,8 @@ export default function PaymentPage() {
               <p className="text-muted-foreground mb-4">
                 You can now contact the driver and coordinate your pickup.
               </p>
-              <Button className="w-full" onClick={() => navigate(`/rides/${booking.ride_id}`)}>
+              {/* Replaces this success screen in history, so Back from the ride skips past it. */}
+              <Button className="w-full" onClick={() => navigate(`/rides/${booking.ride_id}`, { replace: true })}>
                 View Ride Details
               </Button>
             </CardContent>

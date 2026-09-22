@@ -49,5 +49,8 @@ imports both.
 - Location uses a quick reading (Wi-Fi/towers) and a precise GPS reading together; the quick one appears at once with an
   accuracy circle and GPS sharpens it.
 - "Find a Ride" matches by **distance**: rides that start within 12 km of the pickup and end within 12 km of the
-  destination (30 km with "search wider"), nearest first, in a results panel.
+  destination (30 km with "search wider"), nearest first, in a results panel. Its optional "Leaving on" date is
+  bounded to the earliest and latest departure actually found across all dates (`SearchResults.dateBounds`, set from
+  the first, unfiltered search and kept while narrowing to one date), so it can't be pointed at a day nothing on
+  the route could ever match.
 - Place search uses MapTiler (with OpenStreetMap as a fallback); routes use OSRM's public server.
