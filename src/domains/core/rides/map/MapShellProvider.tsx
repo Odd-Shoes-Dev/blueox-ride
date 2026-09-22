@@ -7,8 +7,10 @@ import { useAuth } from '@/domains/core/auth/AuthContext'
 import { useLiveTrip } from '@/domains/core/rides/hooks/useLiveTrip'
 import { haversineKm } from '@/domains/core/rides/lib/routeProgress'
 import { DEFAULT_SEARCH_RADIUS_KM } from '@/domains/core/rides/map/searchConstants'
+import { toLocalDateInput } from '@/shared/lib/utils'
 import type { PinKind } from '@/domains/core/rides/components/mapPins'
 import type { PlacedPoint } from '@/domains/core/rides/components/PinPlacer'
+import type { RideRequest } from '@/shared/types'
 import {
   MapShellContext,
   type FeaturedRoute,
@@ -20,6 +22,20 @@ import {
   type PinRequest,
   type RideWithDriver,
 } from '@/domains/core/rides/map/MapShellContext'
+
+// The earliest/latest departure date among a set of matching rides, as 'YYYY-MM-DD' — the
+// "Leaving on" field's min/max on the results page. Null with no rides to bound it by.
+function dateBoundsOf(rides: RideResult[]): { min: string; max: string } | null {
+  if (rides.length === 0) return null
+  let min = toLocalDateInput(rides[0].departure_time)
+  let max = min
+  for (const ride of rides) {
+    const day = toLocalDateInput(ride.departure_time)
+    if (day < min) min = day
+    if (day > max) max = day
+  }
+  return { min, max }
+}
 
 // Holds everything the persistent map and the screens on top of it share, so
 // moving between screens (opening Offer a Ride, My Rides, ...) never reloads
@@ -288,11 +304,27 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
         )
 
         searchCount.current += 1
-        setResults({ rides: matched, origin, destination, radiusKm, date: options.date, token: searchCount.current })
+        setResults((prev) => ({
+          rides: matched,
+          origin,
+          destination,
+          radiusKm,
+          date: options.date,
+          dateBounds: options.date === undefined ? dateBoundsOf(matched) : (prev?.dateBounds ?? null),
+          token: searchCount.current,
+        }))
       } catch (err) {
         console.error('Search error:', err)
         searchCount.current += 1
-        setResults({ rides: [], origin, destination, radiusKm, date: options.date, token: searchCount.current })
+        setResults((prev) => ({
+          rides: [],
+          origin,
+          destination,
+          radiusKm,
+          date: options.date,
+          dateBounds: options.date === undefined ? null : (prev?.dateBounds ?? null),
+          token: searchCount.current,
+        }))
       } finally {
         setSearching(false)
       }
@@ -345,6 +377,10 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
 
   // ---- Pins from panel pages, place-search focus, map centre ----
   const [panelPins, setPanelPins] = useState<PanelPins | null>(null)
+  // ---- Open ride requests shown on the map while the Ride Requests page is open ----
+  const [requestPins, setRequestPins] = useState<RideRequest[] | null>(null)
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
+  const selectRequest = useCallback((requestId: string | null) => setSelectedRequestId(requestId), [])
   const [focus, setFocus] = useState<{ lat: number; lng: number } | null>(null)
   const focusOn = useCallback((lat: number, lng: number) => setFocus({ lat, lng }), [])
   const mapCenterRef = useRef<{ lat: number; lng: number } | null>(null)
@@ -389,6 +425,10 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
       finishPin,
       panelPins,
       setPanelPins,
+      requestPins,
+      setRequestPins,
+      selectedRequestId,
+      selectRequest,
       liveTrip: live.liveTrip,
       livePosition: live.livePosition,
       liveError: live.liveError,
@@ -434,6 +474,9 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
       requestPin,
       finishPin,
       panelPins,
+      requestPins,
+      selectedRequestId,
+      selectRequest,
       live.liveTrip,
       live.livePosition,
       live.liveError,

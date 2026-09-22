@@ -8,6 +8,7 @@ when a feature changes, update its page in the same change.
 | Page | What it covers |
 |------|----------------|
 | [booking-requests.md](booking-requests.md) | Asking a driver for a seat with your own pickup, drop-off and offer: rules, database, screens |
+| [ride-requests.md](ride-requests.md) | A rider posting "I need a ride" for any driver to accept: who can see them, map pins |
 | [payments-switch.md](payments-switch.md) | Payments are OFF (free bookings): what that means, and how to turn them on later |
 | [trips-and-seats.md](trips-and-seats.md) | Live trip mode, and how drivers keep the seat count true (seats, "picked up", no-shows) |
 | [ride-editing.md](ride-editing.md) | Editing a posted ride (locks once it has a booking), and cancelling |

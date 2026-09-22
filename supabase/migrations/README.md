@@ -19,6 +19,8 @@ There is no automated migration runner in this project — apply each file manua
 | 11 | `11_consent.sql` | Records when each user agreed to the Terms/Privacy Policy and which version (`users.terms_accepted_at`, `terms_version`), stores it from the sign-up trigger, and adds `accept_terms()` for the one-time consent screen. See `docs/privacy-and-consent.md`. |
 | 12 | `12_private_live_location.sql` | Makes the live driver-location channel private: only the ride's driver can send, only the driver and confirmed passengers can listen (rules on `realtime.messages`). **Run before deploying the matching app version.** |
 | 13 | `13_ride_editing.sql` | Lets a driver edit their own ride (route, date/time, price, seats, notes, car details) via a new Edit Ride page, but locks route/date/time/price/seats once the ride has a booking or an adjusted seat (`guard_ride_edit` trigger). Notes and car details always stay editable. See `docs/ride-editing.md`. |
+| 14 | `14_ride_request_visibility.sql` | Restricts browsing open ride requests to signed-in users (it had no such check before). See `docs/ride-requests.md`. |
+| 15 | `15_always_ask_driver.sql` | Removes the instant-booking path entirely: every booking on a driver-posted ride now goes through the driver as a request (revokes `book_ride()`'s grant), raises the per-ride attempt limit from 3 to 4, and a request now expires at the ride's departure time instead of a fixed 2 hours. See `docs/booking-requests.md`. |
 
 ## Verifying a step worked
 

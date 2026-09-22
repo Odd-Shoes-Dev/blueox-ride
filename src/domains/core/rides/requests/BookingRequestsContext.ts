@@ -1,8 +1,8 @@
 import { createContext, useContext } from 'react'
 import type { DeclineReason } from '@/shared/types'
 
-// Must match the limit enforced in the database (supabase migration 10).
-export const MAX_REQUEST_ATTEMPTS = 3
+// Must match the limit enforced in the database (supabase migration 15).
+export const MAX_REQUEST_ATTEMPTS = 4
 
 export const DECLINE_REASON_LABELS: Record<DeclineReason, string> = {
   offer_too_low: 'The offer is too low',

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect } from 'react'
 import type { ridesRepository } from '@/shared/services/database'
 import type { PinKind } from '@/domains/core/rides/components/mapPins'
 import type { PlacedPoint } from '@/domains/core/rides/components/PinPlacer'
+import type { RideRequest } from '@/shared/types'
 
 // Shared state for the persistent map that sits behind every screen (see
 // app/MapShell). It lives here, in the rides domain, so pages and components
@@ -54,6 +55,11 @@ export interface SearchResults {
   destination: PlacedPoint | null
   radiusKm: number
   date?: string
+  // The earliest and latest departure date among matching rides across ALL dates (computed the
+  // last time a search ran with no date filter, then kept as-is while narrowing to one date) —
+  // what the "Leaving on" field's min/max are bounded to, so it can't be pointed at a day this
+  // route has no ride on. Null when there are no matching rides at all to bound it by.
+  dateBounds: { min: string; max: string } | null
   // Changes with every search, so the map knows to re-fit itself
   token: number
 }
@@ -130,6 +136,14 @@ export interface MapShellValue {
   // Pins that a panel page (e.g. Offer a Ride) wants shown on the map
   panelPins: PanelPins | null
   setPanelPins: (pins: PanelPins | null) => void
+
+  // Open ride requests shown as their own pins while the Ride Requests page is open
+  // (signed-in drivers only — requests aren't readable while signed out; see migration 14).
+  // Tapping one sets `selectedRequestId`; the page reacts to it and clears it back to null.
+  requestPins: RideRequest[] | null
+  setRequestPins: (requests: RideRequest[] | null) => void
+  selectedRequestId: string | null
+  selectRequest: (requestId: string | null) => void
   // Live trip: the driver shares their position as they drive (the map follows them,
   // shows distance/time left, keeps the screen awake); passengers follow the driver.
   // It runs in the app shell, so it keeps going when panels are closed.
@@ -176,4 +190,16 @@ export function useMapPins(origin: PlacedPoint | null, destination: PlacedPoint 
     // Keyed on the coordinates: callers pass fresh objects every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setPanelPins, origin?.lat, origin?.lng, destination?.lat, destination?.lng])
+}
+
+// Shows open ride requests as their own pins on the shared map while the Ride Requests
+// page is mounted (see RideRequestsPage). Cleared when it unmounts or the list changes.
+export function useRideRequestPins(requests: RideRequest[]) {
+  const shell = useOptionalMapShell()
+  const setRequestPins = shell?.setRequestPins
+
+  useEffect(() => {
+    setRequestPins?.(requests)
+    return () => setRequestPins?.(null)
+  }, [setRequestPins, requests])
 }

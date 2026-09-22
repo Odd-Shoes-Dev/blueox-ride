@@ -25,6 +25,17 @@ export function formatDate(date: Date | string): string {
   }).format(d)
 }
 
+// A date as 'YYYY-MM-DD' in the browser's own timezone — what an <input type="date"> needs.
+// Deliberately not `.toISOString().split('T')[0]`, which converts to UTC first and can land on
+// the wrong calendar day near midnight, in either direction, for anyone off UTC+0.
+export function toLocalDateInput(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 // The message from an error of any shape (a JavaScript Error, or the plain error object the
 // database client throws), for showing to the user.
 export function getErrorMessage(error: unknown, fallback = 'Please try again.'): string {

@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { rideRequestsRepository } from '@/shared/services/database'
 import { useAuth } from '@/domains/core/auth/AuthContext'
+import { useOpenRequestCount } from '@/domains/core/rides/hooks/useOpenRequestCount'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
 import { HomePageSEO } from '@/shared/components/SEO'
@@ -50,7 +50,7 @@ export default function HomePage({
   const placingPin = shell.editing !== null
   // A live trip bar sits at the top of the map, so the cards below it shift down to make room.
   const tripOffsetRem = shell.liveTrip ? 6.5 : 0
-  const [openRequestCount, setOpenRequestCount] = useState<number | null>(null)
+  const openRequestCount = useOpenRequestCount()
 
   // Memoize dynamic styles based on brand colors
   const brandStyles = useMemo(() => {
@@ -75,15 +75,6 @@ export default function HomePage({
       isCustom: true,
     }
   }, [brandColors])
-
-  // Show drivers a concrete demand signal ("N riders waiting") instead of a
-  // generic "check for requests" link — value visible immediately, no click required.
-  useEffect(() => {
-    rideRequestsRepository
-      .getOpenRideRequests()
-      .then((requests) => setOpenRequestCount(requests.length))
-      .catch(() => setOpenRequestCount(null))
-  }, [])
 
   return (
     <>

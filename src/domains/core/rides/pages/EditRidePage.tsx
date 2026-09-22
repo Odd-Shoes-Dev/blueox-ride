@@ -109,7 +109,8 @@ export default function EditRidePage() {
         return
       }
       toast({ title: 'Ride updated', variant: 'success' })
-      navigate(`/rides/${id}`)
+      // Replaces the now-saved form in history, so Back from the ride skips past it.
+      navigate(`/rides/${id}`, { replace: true })
       return
     }
 
@@ -167,7 +168,8 @@ export default function EditRidePage() {
     }
 
     toast({ title: 'Ride updated', variant: 'success' })
-    navigate(`/rides/${id}`)
+    // Replaces the now-saved form in history, so Back from the ride skips past it.
+    navigate(`/rides/${id}`, { replace: true })
   }
 
   const now = new Date()

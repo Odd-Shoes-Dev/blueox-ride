@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { rideRequestsRepository } from '@/shared/services/database'
 import { useAuth } from '@/domains/core/auth/AuthContext'
+import { useOptionalMapShell, useRideRequestPins } from '@/domains/core/rides/map/MapShellContext'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
 import { Input } from '@/shared/ui/input'
@@ -28,6 +29,8 @@ export default function RideRequestsPage() {
 
   const hasPhoneNumber = !!profile?.phone_number
   const hasFetched = useRef(false)
+  const shell = useOptionalMapShell()
+  useRideRequestPins(requests) // shows each open request as its own pin on the shared map
 
   const fetchRequests = useCallback(async () => {
     setLoading(true)
@@ -66,6 +69,16 @@ export default function RideRequestsPage() {
     setDepartureTime(new Date(request.departure_time).toTimeString().slice(0, 5))
   }
 
+  // Tapping a request's pin on the map opens the same Accept dialog as tapping its card.
+  const selectedRequestId = shell?.selectedRequestId ?? null
+  useEffect(() => {
+    if (!selectedRequestId) return
+    const request = requests.find((r) => r.id === selectedRequestId)
+    if (request) openAcceptDialog(request)
+    shell?.selectRequest(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRequestId])
+
   const handleAccept = async () => {
     if (!acceptTarget) return
 
@@ -85,7 +98,9 @@ export default function RideRequestsPage() {
         variant: 'success',
       })
       setAcceptTarget(null)
-      navigate(`/rides/${rideId}`)
+      // Replaces this browsing list in history, so Back from the new ride skips past it
+      // rather than returning to a request that's already been accepted and is gone.
+      navigate(`/rides/${rideId}`, { replace: true })
     } catch (error) {
       console.error('Accept request error:', error)
       toast({

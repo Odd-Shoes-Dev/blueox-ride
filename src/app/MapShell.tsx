@@ -130,6 +130,8 @@ function MapShellLayout({ panels }: MapShellProps) {
         origin={pins?.origin ?? null}
         destination={pins?.destination ?? null}
         myRides={shell.myRides}
+        requests={shell.requestPins ?? []}
+        onSelectRequest={shell.selectRequest}
         featured={isPanel && shell.featured?.isDefault ? null : shell.featured}
         onSelectRide={shell.selectRide}
         onDeselectRide={shell.deselectRide}

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { LEGAL } from '@/domains/core/legal/legalConfig'
 import { usePayments } from '@/shared/contexts/AppSettingsContext'
+import { MAX_REQUEST_ATTEMPTS } from '@/domains/core/rides/requests/BookingRequestsContext'
 import {
   LegalLayout,
   LegalList,
@@ -27,7 +28,9 @@ function FeesContent() {
             ride. Any agreement about payment is between you and the driver.
           </li>
           <li>All prices are in Ugandan shillings (UGX).</li>
-          <li>A booking is confirmed as soon as you make it, as long as seats are still available.</li>
+          <li>
+            A booking request goes to the driver, who accepts or refuses it — a seat is only yours once they accept.
+          </li>
         </LegalList>
         <p>
           We may introduce fees in future. If we do, we will tell you in the Service and update these Terms before they
@@ -50,7 +53,10 @@ function FeesContent() {
           Online payments are handled by our payment provider, Pesapal, and your mobile money operator, and are also
           subject to their terms. Their charges, if any, are theirs.
         </li>
-        <li>A booking is confirmed only once the booking fee has been paid successfully.</li>
+        <li>
+          A booking request goes to the driver first, who accepts or refuses it. Once they accept, it is confirmed
+          only after the booking fee has been paid successfully.
+        </li>
       </LegalList>
       <p>
         A portion of the booking fee may be shared with a partner church if you arrived through that church's page.
@@ -205,10 +211,11 @@ const sections: LegalSection[] = [
           the Service, and we are not a party to it.
         </li>
         <li>
-          <strong>Booking requests:</strong> instead of booking instantly, you can ask a driver for a seat with your own
-          pickup, drop-off and offer. The driver may accept or refuse. You can send up to 3 requests on the same ride,
-          and each new request after a refusal must change something (your offer, seats, or stops). A driver may also
-          stop further requests from someone on their ride.
+          <strong>Booking a seat:</strong> every booking is a request — with your seats, pickup, drop-off and offer —
+          that the driver accepts or refuses; a seat is only yours once they accept. You can send up to{' '}
+          {MAX_REQUEST_ATTEMPTS} requests on the same ride, and each new request after a refusal must change
+          something (your offer, seats, or stops). A driver may also stop further requests from someone on their
+          ride.
         </li>
       </LegalList>
     ),
