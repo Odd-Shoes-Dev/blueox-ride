@@ -12,7 +12,16 @@ Needs migration [`13_ride_editing.sql`](../supabase/migrations/13_ride_editing.s
 | **Create** | Offer a Ride | — |
 | **Edit** | "Edit" on Ride Details or My Rides (`/rides/:id/edit`) | See rule below |
 | **Adjust seats on the road** | Seats −/+ on the trip bar or My Rides | Unaffected by editing — see [trips-and-seats.md](trips-and-seats.md) |
-| **Cancel** | "Cancel Ride" on My Rides | Sets the ride to `cancelled`; it stays in the database (bookings and reviews reference it) and any free bookings on it are cancelled too. There's no hard delete. |
+| **Cancel** (before departure) | "Cancel Ride" on My Rides | Sets the ride to `cancelled`; it stays in the database (bookings and reviews reference it) and any free bookings on it are cancelled too. There's no hard delete. |
+| **Mark completed** (after departure) | "Mark Trip Completed" on My Rides | Sets the ride and its confirmed bookings to `completed` — this is what unlocks reviews (their RLS insert policy requires it). Manual only; nothing marks a ride completed automatically. |
+| **"Didn't happen"** (after departure) | "Didn't happen" next to Mark Trip Completed | For when the ride fell through and nobody used "Cancel Ride" in time. Same cancellation as above (seats freed, free bookings cancelled, paid ones refunded) — a driver isn't stuck choosing between falsely marking a ride "completed" or leaving it sitting there forever. |
+
+Both post-departure actions only appear once `departure_time` has passed; before that, only "Cancel Ride" shows.
+A banner at the top of My Rides — *"Did your ride happen?"* — nudges the driver toward one of them once a ride
+has sat unresolved for **3 hours** past its departure time (`ridesNeedingClosure` in `MyRidesPage.tsx`), tapping
+through to the Driving tab. Deliberately a nudge, not an automatic status change: auto-completing would
+implicitly assert a ride happened when the driver never confirmed that, which would let people review a ride
+that may have fallen through.
 
 ## The editing rule
 

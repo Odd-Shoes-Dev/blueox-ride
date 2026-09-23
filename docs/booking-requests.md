@@ -80,8 +80,10 @@ and `c_max_attempts` in the SQL. Change both together.
   - *For my rides* (driver): each request with the rider, pickup and drop-off, straight-line
     distances from the ride's start and end, seats, the offer against the listed price, what the
     driver would receive, time left, **Accept**, **Refuse** and **Show on map** (draws the ride's
-    own route and the passenger's chosen pickup/drop-off pins together). Sorted by offer,
-    highest first. Answered requests are listed below.
+    own route and the passenger's chosen pickup/drop-off pins together). Grouped by ride (soonest
+    departure first) once a driver has two or more rides with requests out at once, so they don't
+    interleave — a single ride's requests still just read as one plain list. Sorted by offer,
+    highest first, within each ride. Answered requests are listed below.
   - *My requests* (rider): everything they sent, with status, and Withdraw for waiting ones.
 - **Notifications** (`BookingRequestsProvider`): while the app is open, a pop-up when a request
   arrives (driver) or is answered (rider), and a number badge on **My Rides** in the bottom bar.

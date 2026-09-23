@@ -159,10 +159,29 @@ export default function BookingRequestsPage() {
     refresh()
   }
 
-  // Highest offer first — a driver can hold several requests for the same seats at once now
-  // (there's no more instant, first-come-first-served booking), so put the best one up top.
-  const waitingForMe = forMe.filter(isWaiting).sort((a, b) => b.offer_price - a.offer_price)
+  const waitingForMe = forMe.filter(isWaiting)
   const answeredForMe = forMe.filter((request) => !isWaiting(request))
+
+  // Grouped by ride (soonest departure first), highest offer first within each group — a driver
+  // can hold several requests for the same seats at once now (there's no more instant,
+  // first-come-first-served booking), and with two-plus rides out, their requests would
+  // otherwise interleave by price with nothing but a small muted line saying which is which.
+  // The ride heading below only renders once there's more than one group, so a driver with a
+  // single ride out sees exactly what they did before.
+  const requestGroups = (() => {
+    const byRide = new Map<string, { ride: BookingRequestWithDetails['ride']; requests: BookingRequestWithDetails[] }>()
+    for (const request of waitingForMe) {
+      let group = byRide.get(request.ride_id)
+      if (!group) {
+        group = { ride: request.ride, requests: [] }
+        byRide.set(request.ride_id, group)
+      }
+      group.requests.push(request)
+    }
+    return [...byRide.values()]
+      .map((group) => ({ ...group, requests: [...group.requests].sort((a, b) => b.offer_price - a.offer_price) }))
+      .sort((a, b) => a.ride.departure_time.localeCompare(b.ride.departure_time))
+  })()
 
   return (
     <div className="min-h-full bg-background pb-8">
@@ -201,115 +220,125 @@ export default function BookingRequestsPage() {
                   </CardContent>
                 </Card>
               ) : (
-                waitingForMe.map((request) => {
-                  const { pickup, dropoff } = stopsOf(request)
-                  const { ride } = request
-                  const rideOrigin = { lat: ride.origin_lat, lng: ride.origin_lng }
-                  const rideEnd = { lat: ride.destination_lat, lng: ride.destination_lng }
-                  const pickupFromStart = haversineKm(rideOrigin, pickup)
-                  const dropoffFromEnd = haversineKm(rideEnd, dropoff)
-                  const theirTrip = haversineKm(pickup, dropoff)
-                  const wholeRoute = haversineKm(rideOrigin, rideEnd)
-                  const listedTotal = ride.price * request.seats
-                  const offerTotal = request.offer_price * request.seats
-                  const difference = request.offer_price - ride.price
-                  const busy = busyId === request.id
+                requestGroups.map((group) => (
+                  <div key={group.ride.id} className="space-y-3">
+                    {requestGroups.length > 1 && (
+                      <p className="text-sm font-semibold px-1">
+                        {group.ride.origin_name} → {group.ride.destination_name}
+                        <span className="font-normal text-muted-foreground"> · {formatDate(group.ride.departure_time)}</span>
+                      </p>
+                    )}
+                    {group.requests.map((request) => {
+                      const { pickup, dropoff } = stopsOf(request)
+                      const { ride } = request
+                      const rideOrigin = { lat: ride.origin_lat, lng: ride.origin_lng }
+                      const rideEnd = { lat: ride.destination_lat, lng: ride.destination_lng }
+                      const pickupFromStart = haversineKm(rideOrigin, pickup)
+                      const dropoffFromEnd = haversineKm(rideEnd, dropoff)
+                      const theirTrip = haversineKm(pickup, dropoff)
+                      const wholeRoute = haversineKm(rideOrigin, rideEnd)
+                      const listedTotal = ride.price * request.seats
+                      const offerTotal = request.offer_price * request.seats
+                      const difference = request.offer_price - ride.price
+                      const busy = busyId === request.id
 
-                  return (
-                    <Card key={request.id} className={selectedId === request.id ? 'ring-2 ring-primary' : ''}>
-                      <CardContent className="p-4 space-y-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="font-medium">{request.passenger.full_name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {request.passenger.average_rating ? `★ ${request.passenger.average_rating.toFixed(1)} · ` : ''}
-                              {request.passenger.total_rides} trip{request.passenger.total_rides === 1 ? '' : 's'}
-                              {request.attempt_no > 1 ? ` · attempt ${request.attempt_no} of ${MAX_REQUEST_ATTEMPTS}` : ''}
-                            </p>
-                          </div>
-                          <span className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
-                            <Clock className="w-3 h-3" /> {timeLeft(request.expires_at)} left
-                          </span>
-                        </div>
-
-                        <div className="text-sm space-y-1">
-                          <p className="text-xs text-muted-foreground">
-                            Your ride: {ride.origin_name} → {ride.destination_name} · {formatDate(ride.departure_time)}
-                          </p>
-                          <p className="flex items-start gap-2">
-                            <MapPin className="w-4 h-4 mt-0.5 text-green-600 flex-shrink-0" />
-                            <span>
-                              <span className="font-medium">{pickup.name}</span>
-                              <span className="block text-xs text-muted-foreground">
-                                {pickup.custom
-                                  ? `Gets in about ${formatDistance(pickupFromStart)} from your start`
-                                  : 'Gets in at your start'}
+                      return (
+                        <Card key={request.id} className={selectedId === request.id ? 'ring-2 ring-primary' : ''}>
+                          <CardContent className="p-4 space-y-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="font-medium">{request.passenger.full_name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {request.passenger.average_rating ? `★ ${request.passenger.average_rating.toFixed(1)} · ` : ''}
+                                  {request.passenger.total_rides} trip{request.passenger.total_rides === 1 ? '' : 's'}
+                                  {request.attempt_no > 1 ? ` · attempt ${request.attempt_no} of ${MAX_REQUEST_ATTEMPTS}` : ''}
+                                </p>
+                              </div>
+                              <span className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
+                                <Clock className="w-3 h-3" /> {timeLeft(request.expires_at)} left
                               </span>
-                            </span>
-                          </p>
-                          <p className="flex items-start gap-2">
-                            <Navigation className="w-4 h-4 mt-0.5 text-navy-900 flex-shrink-0" />
-                            <span>
-                              <span className="font-medium">{dropoff.name}</span>
-                              <span className="block text-xs text-muted-foreground">
-                                {dropoff.custom
-                                  ? `Gets off about ${formatDistance(dropoffFromEnd)} from your destination`
-                                  : 'Gets off at your destination'}
-                              </span>
-                            </span>
-                          </p>
-                          {(pickup.custom || dropoff.custom) && (
-                            <p className="text-xs text-muted-foreground pl-6">
-                              Their trip: about {formatDistance(theirTrip)} of your {formatDistance(wholeRoute)} route (straight-line)
-                            </p>
-                          )}
-                        </div>
+                            </div>
 
-                        <div className="rounded-lg bg-muted p-3 text-sm space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="flex items-center gap-1 text-muted-foreground">
-                              <Users className="w-4 h-4" /> {request.seats} seat{request.seats > 1 ? 's' : ''}
-                            </span>
-                            <span className="flex items-center gap-1 font-semibold">
-                              <Wallet className="w-4 h-4" /> Offers {formatCurrency(request.offer_price)}/seat
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>Your price: {formatCurrency(ride.price)}/seat</span>
-                            <span>
-                              {difference === 0
-                                ? 'Matches your price'
-                                : difference < 0
-                                  ? `${formatCurrency(-difference)} lower`
-                                  : `${formatCurrency(difference)} higher`}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground">
-                              You'd receive in cash{request.seats > 1 ? ` (${request.seats} seats)` : ''}
-                            </span>
-                            <span className="font-medium">
-                              {formatCurrency(offerTotal)}
-                              {offerTotal !== listedTotal ? ` (listed ${formatCurrency(listedTotal)})` : ''}
-                            </span>
-                          </div>
-                        </div>
+                            <div className="text-sm space-y-1">
+                              <p className="text-xs text-muted-foreground">
+                                Your ride: {ride.origin_name} → {ride.destination_name} · {formatDate(ride.departure_time)}
+                              </p>
+                              <p className="flex items-start gap-2">
+                                <MapPin className="w-4 h-4 mt-0.5 text-green-600 flex-shrink-0" />
+                                <span>
+                                  <span className="font-medium">{pickup.name}</span>
+                                  <span className="block text-xs text-muted-foreground">
+                                    {pickup.custom
+                                      ? `Gets in about ${formatDistance(pickupFromStart)} from your start`
+                                      : 'Gets in at your start'}
+                                  </span>
+                                </span>
+                              </p>
+                              <p className="flex items-start gap-2">
+                                <Navigation className="w-4 h-4 mt-0.5 text-navy-900 flex-shrink-0" />
+                                <span>
+                                  <span className="font-medium">{dropoff.name}</span>
+                                  <span className="block text-xs text-muted-foreground">
+                                    {dropoff.custom
+                                      ? `Gets off about ${formatDistance(dropoffFromEnd)} from your destination`
+                                      : 'Gets off at your destination'}
+                                  </span>
+                                </span>
+                              </p>
+                              {(pickup.custom || dropoff.custom) && (
+                                <p className="text-xs text-muted-foreground pl-6">
+                                  Their trip: about {formatDistance(theirTrip)} of your {formatDistance(wholeRoute)} route (straight-line)
+                                </p>
+                              )}
+                            </div>
 
-                        <div className="flex gap-2">
-                          <Button className="flex-1" onClick={() => accept(request)} loading={busy}>
-                            Accept
-                          </Button>
-                          <Button variant="outline" className="flex-1" disabled={busy} onClick={() => setDeclineTarget(request)}>
-                            Refuse
-                          </Button>
-                        </div>
-                        <Button variant="ghost" size="sm" className="w-full" onClick={() => toggleOnMap(request)}>
-                          {selectedId === request.id ? 'Hide on map' : 'Show on map'}
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  )
-                })
+                            <div className="rounded-lg bg-muted p-3 text-sm space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="flex items-center gap-1 text-muted-foreground">
+                                  <Users className="w-4 h-4" /> {request.seats} seat{request.seats > 1 ? 's' : ''}
+                                </span>
+                                <span className="flex items-center gap-1 font-semibold">
+                                  <Wallet className="w-4 h-4" /> Offers {formatCurrency(request.offer_price)}/seat
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>Your price: {formatCurrency(ride.price)}/seat</span>
+                                <span>
+                                  {difference === 0
+                                    ? 'Matches your price'
+                                    : difference < 0
+                                      ? `${formatCurrency(-difference)} lower`
+                                      : `${formatCurrency(difference)} higher`}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">
+                                  You'd receive in cash{request.seats > 1 ? ` (${request.seats} seats)` : ''}
+                                </span>
+                                <span className="font-medium">
+                                  {formatCurrency(offerTotal)}
+                                  {offerTotal !== listedTotal ? ` (listed ${formatCurrency(listedTotal)})` : ''}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2">
+                              <Button className="flex-1" onClick={() => accept(request)} loading={busy}>
+                                Accept
+                              </Button>
+                              <Button variant="outline" className="flex-1" disabled={busy} onClick={() => setDeclineTarget(request)}>
+                                Refuse
+                              </Button>
+                            </div>
+                            <Button variant="ghost" size="sm" className="w-full" onClick={() => toggleOnMap(request)}>
+                              {selectedId === request.id ? 'Hide on map' : 'Show on map'}
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                ))
               )}
 
               {answeredForMe.length > 0 && (

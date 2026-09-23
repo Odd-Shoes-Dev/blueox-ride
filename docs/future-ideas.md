@@ -131,3 +131,4 @@ range at all.
 **The idea.** Replace the plain date field with a small custom calendar component (a real UI piece, not a tweak)
 that only shows days with at least one matching ride as selectable, greying out the rest — so every day it's
 possible to pick is guaranteed to show something.
+

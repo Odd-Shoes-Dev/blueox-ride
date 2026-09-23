@@ -58,7 +58,10 @@ export default function MyRidesPage() {
   const [myBookings, setMyBookings] = useState<BookingWithRide[]>([])
   const [myRequests, setMyRequests] = useState<RideRequest[]>([])
   const [loading, setLoading] = useState(true)
-  const [cancelDialog, setCancelDialog] = useState<{ type: 'ride' | 'booking' | 'request' | 'noshow'; id: string } | null>(null)
+  const [cancelDialog, setCancelDialog] = useState<{
+    type: 'ride' | 'ride_didnt_happen' | 'booking' | 'request' | 'noshow'
+    id: string
+  } | null>(null)
   const [canceling, setCanceling] = useState(false)
   const [reviewedBookingIds, setReviewedBookingIds] = useState<Set<string>>(new Set())
   const [reviewTarget, setReviewTarget] = useState<{ bookingId: string; revieweeId: string; revieweeName: string } | null>(null)
@@ -404,6 +407,18 @@ export default function MyRidesPage() {
     )
   }
 
+  // Rides that departed a while ago and are still sitting as Active/Full — nobody's tapped
+  // "Mark Trip Completed" or "Didn't happen" yet. A nudge, not an automatic status change:
+  // marking one "completed" is also an assertion that it genuinely happened, which should stay
+  // a human decision (see docs/future-ideas.md #14). The 3-hour grace period is deliberately
+  // generous, so a ride that's simply still in progress doesn't get flagged mid-trip.
+  const CLOSURE_GRACE_MS = 3 * 60 * 60 * 1000
+  const ridesNeedingClosure = myRides.filter(
+    (ride) =>
+      (ride.status === 'active' || ride.status === 'full') &&
+      Date.now() - new Date(ride.departure_time).getTime() > CLOSURE_GRACE_MS
+  )
+
   return (
     <div className="min-h-full bg-background pb-8">
       {/* Header */}
@@ -428,6 +443,23 @@ export default function MyRidesPage() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Nudge: a ride that departed a while ago and was never marked completed or "didn't
+              happen" — see the note on ridesNeedingClosure above. */}
+          {ridesNeedingClosure.length > 0 && (
+            <Card className="border-primary mb-4">
+              <CardContent className="p-3 flex items-center justify-between gap-3">
+                <p className="text-sm">
+                  {ridesNeedingClosure.length === 1
+                    ? 'Did your ride happen?'
+                    : `Did your ${ridesNeedingClosure.length} rides happen?`}
+                </p>
+                <Button size="sm" onClick={() => setActiveTab('driving')}>
+                  Review
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full">
@@ -896,14 +928,21 @@ export default function MyRidesPage() {
 
                       {(ride.status === 'active' || ride.status === 'full') &&
                         new Date(ride.departure_time) <= new Date() && (
-                        <div className="mt-4 pt-4 border-t">
+                        <div className="mt-4 pt-4 border-t flex gap-2">
                           <Button
-                            className="w-full"
+                            className="flex-1"
                             loading={completingRideId === ride.id}
                             onClick={() => handleMarkRideCompleted(ride.id)}
                           >
                             <CheckCircle className="w-4 h-4 mr-2" />
                             Mark Trip Completed
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="flex-1 text-destructive hover:text-destructive"
+                            onClick={() => setCancelDialog({ type: 'ride_didnt_happen', id: ride.id })}
+                          >
+                            Didn't happen
                           </Button>
                         </div>
                       )}
@@ -924,12 +963,14 @@ export default function MyRidesPage() {
             <DialogTitle>
               {cancelDialog?.type === 'noshow'
                 ? 'Mark as a no-show?'
+                : cancelDialog?.type === 'ride_didnt_happen'
+                ? "This ride didn't happen?"
                 : `Cancel ${cancelDialog?.type === 'ride' ? 'Ride' : cancelDialog?.type === 'request' ? 'Request' : 'Booking'}?`}
             </DialogTitle>
             <DialogDescription>
               {cancelDialog?.type === 'noshow'
                 ? "This passenger didn't turn up. Their booking is cancelled and their seat goes back on the ride so someone else can take it."
-                : cancelDialog?.type === 'ride'
+                : cancelDialog?.type === 'ride' || cancelDialog?.type === 'ride_didnt_happen'
                 ? paymentsEnabled
                   ? 'All confirmed passengers will be refunded their booking fees.'
                   : 'Passengers who booked this ride will see that it is cancelled.'
@@ -942,13 +983,17 @@ export default function MyRidesPage() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCancelDialog(null)}>
-              {cancelDialog?.type === 'noshow' ? 'Not yet' : `Keep ${cancelDialog?.type === 'ride' ? 'Ride' : cancelDialog?.type === 'request' ? 'Request' : 'Booking'}`}
+              {cancelDialog?.type === 'noshow'
+                ? 'Not yet'
+                : cancelDialog?.type === 'ride_didnt_happen'
+                ? 'Never mind'
+                : `Keep ${cancelDialog?.type === 'ride' ? 'Ride' : cancelDialog?.type === 'request' ? 'Request' : 'Booking'}`}
             </Button>
             <Button
               variant="destructive"
               loading={canceling}
               onClick={() => {
-                if (cancelDialog?.type === 'ride') {
+                if (cancelDialog?.type === 'ride' || cancelDialog?.type === 'ride_didnt_happen') {
                   handleCancelRide(cancelDialog.id)
                 } else if (cancelDialog?.type === 'request') {
                   handleCancelRequest(cancelDialog.id)
@@ -959,7 +1004,11 @@ export default function MyRidesPage() {
                 }
               }}
             >
-              {cancelDialog?.type === 'noshow' ? 'Mark no-show' : `Cancel ${cancelDialog?.type === 'ride' ? 'Ride' : cancelDialog?.type === 'request' ? 'Request' : 'Booking'}`}
+              {cancelDialog?.type === 'noshow'
+                ? 'Mark no-show'
+                : cancelDialog?.type === 'ride_didnt_happen'
+                ? "Yes, it didn't happen"
+                : `Cancel ${cancelDialog?.type === 'ride' ? 'Ride' : cancelDialog?.type === 'request' ? 'Request' : 'Booking'}`}
             </Button>
           </DialogFooter>
         </DialogContent>
