@@ -77,8 +77,11 @@ export default function BookingRequestsPage() {
         bookingRequestsRepository.getRequestsForDriver(userId),
         bookingRequestsRepository.getRequestsForPassenger(userId),
       ])
-      setForMe(driverRows)
-      setMine(passengerRows)
+      // Defensive: a ride can come back null on the embed if RLS ever blocks it (migration 18
+      // fixes the known case — a completed/cancelled ride used to be invisible to its own
+      // passenger). Drop rather than crash the whole page on one bad row.
+      setForMe(driverRows.filter((request) => request.ride != null))
+      setMine(passengerRows.filter((request) => request.ride != null))
     } catch (error) {
       console.error('Could not load booking requests:', error)
       toast({ title: 'Could not load requests', description: getErrorMessage(error), variant: 'destructive' })

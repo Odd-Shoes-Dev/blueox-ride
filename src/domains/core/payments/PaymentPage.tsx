@@ -41,7 +41,10 @@ export default function PaymentPage() {
     try {
       const data = await withTimeout(bookingsRepository.getBookingWithRide(id), 15000)
 
-      if (!data) {
+      // The booking row can come back with its ride as null if RLS ever blocks reading it
+      // (migration 18 fixes the known case) — treat that the same as not found, rather than
+      // crash later reading data.ride.*.
+      if (!data || !data.ride) {
         toast({
           title: 'Booking not found',
           variant: 'destructive',

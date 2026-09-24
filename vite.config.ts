@@ -9,7 +9,6 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['assets/favicon.png', 'assets/logo.png'],
       manifest: {
         name: 'BlueOx Rides',
         short_name: 'BlueOx',
@@ -36,6 +35,15 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        // vite-plugin-pwa separately, always precaches every file in manifest.icons above (with
+        // no revision — it treats the web-app-manifest reference as already stable), and
+        // globPatterns matches those same two .png files again on its own (with a real content
+        // hash) since nothing tells it they're already covered. Workbox refuses to precache a
+        // URL registered twice with two different revisions ("add-to-cache-list-conflicting-
+        // entries"), which broke the service worker outright. Excluding them from the glob here
+        // doesn't drop them from the precache — the manifest.icons path already guarantees that —
+        // it just stops the second, redundant registration.
+        globIgnores: ['assets/favicon.png', 'assets/logo.png'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/zwuoewhxqndmutbfyzka\.supabase\.co\/.*/i,
