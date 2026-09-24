@@ -277,7 +277,7 @@ export default function RideDetailsPage() {
       console.error('Confirm booking error:', error)
       toast({
         title: 'Could not confirm',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        description: getErrorMessage(error),
         variant: 'destructive',
       })
     }

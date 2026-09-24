@@ -23,7 +23,7 @@ import { useOpenRequestCount } from '@/domains/core/rides/hooks/useOpenRequestCo
 import { useToast } from '@/shared/hooks/use-toast'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { ReviewDialog } from '@/domains/core/rides/components/ReviewDialog'
-import { formatCurrency, formatDate, countSuffix } from '@/shared/lib/utils'
+import { formatCurrency, formatDate, countSuffix, getErrorMessage } from '@/shared/lib/utils'
 import { Calendar, Users, Plus, X, Phone, MessageCircle, Wallet, Star, CheckCircle, ArrowRight, Check, Minus, Pencil, MessageSquare } from 'lucide-react'
 import type { RideRequest } from '@/shared/types'
 
@@ -156,7 +156,7 @@ export default function MyRidesPage() {
     } catch (error) {
       toast({
         title: 'Could not change the seats',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        description: getErrorMessage(error),
         variant: 'destructive',
       })
     }
@@ -169,7 +169,7 @@ export default function MyRidesPage() {
     } catch (error) {
       toast({
         title: 'Could not update',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        description: getErrorMessage(error),
         variant: 'destructive',
       })
     }
@@ -189,7 +189,7 @@ export default function MyRidesPage() {
     } catch (error) {
       toast({
         title: 'Could not mark a no-show',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        description: getErrorMessage(error),
         variant: 'destructive',
       })
     }
