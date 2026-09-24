@@ -3,7 +3,10 @@
 See also [ride-requests.md](ride-requests.md) for `14_ride_request_visibility.sql`, added in the
 same batch of changes — restricting who can browse open ride requests.
 
-Needs migration [`13_ride_editing.sql`](../supabase/migrations/13_ride_editing.sql).
+Needs migration [`13_ride_editing.sql`](../supabase/migrations/13_ride_editing.sql), and
+[`16_fix_departure_check.sql`](../supabase/migrations/16_fix_departure_check.sql) — without it, "Mark Trip
+Completed" and "Didn't happen" fail outright on any ride more than an hour past its departure time (a bug in the
+base schema, not in this feature).
 
 ## What a driver can do to their own ride
 
@@ -22,6 +25,13 @@ has sat unresolved for **3 hours** past its departure time (`ridesNeedingClosure
 through to the Driving tab. Deliberately a nudge, not an automatic status change: auto-completing would
 implicitly assert a ride happened when the driver never confirmed that, which would let people review a ride
 that may have fallen through.
+
+## Driving tab order
+
+Active/Full rides first (soonest departure first — same as before), then Completed/Cancelled ones below them,
+most recently departed first. A client-side sort (`sortedMyRides` in `MyRidesPage.tsx`), not a different query:
+without it, a finished ride's departure time is still the *earliest* on record, so a plain "soonest first" sort
+would put it ahead of rides still coming up.
 
 ## The editing rule
 

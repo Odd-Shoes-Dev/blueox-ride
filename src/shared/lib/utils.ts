@@ -5,6 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// " (N)" when N is worth mentioning, or nothing — for tab/list labels, matching how badges
+// elsewhere in the app only appear when there's something to show (e.g. the bottom-nav's
+// pending-request count). A bare "(0)" costs width without telling anyone anything.
+export function countSuffix(count: number): string {
+  return count > 0 ? ` (${count})` : ''
+}
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-UG', {
     style: 'currency',

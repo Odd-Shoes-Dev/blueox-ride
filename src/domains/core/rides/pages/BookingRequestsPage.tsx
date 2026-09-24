@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { useToast } from '@/shared/hooks/use-toast'
-import { formatCurrency, formatDate, getErrorMessage } from '@/shared/lib/utils'
+import { formatCurrency, formatDate, getErrorMessage, countSuffix } from '@/shared/lib/utils'
 import { formatDistance } from '@/domains/core/rides/hooks/useRideRouteOnMap'
 import { haversineKm } from '@/domains/core/rides/lib/routeProgress'
 import { useMapPins, useMapShell } from '@/domains/core/rides/map/MapShellContext'
@@ -199,10 +199,10 @@ export default function BookingRequestsPage() {
           <Tabs defaultValue="driver">
             <TabsList className="w-full">
               <TabsTrigger value="driver" className="flex-1">
-                For my rides ({waitingForMe.length})
+                For my rides{countSuffix(waitingForMe.length)}
               </TabsTrigger>
               <TabsTrigger value="mine" className="flex-1">
-                My requests ({mine.filter(isWaiting).length})
+                My requests{countSuffix(mine.filter(isWaiting).length)}
               </TabsTrigger>
             </TabsList>
 

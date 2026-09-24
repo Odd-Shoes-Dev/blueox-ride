@@ -23,7 +23,7 @@ import { useOpenRequestCount } from '@/domains/core/rides/hooks/useOpenRequestCo
 import { useToast } from '@/shared/hooks/use-toast'
 import { PageContainer } from '@/shared/components/PageContainer'
 import { ReviewDialog } from '@/domains/core/rides/components/ReviewDialog'
-import { formatCurrency, formatDate } from '@/shared/lib/utils'
+import { formatCurrency, formatDate, countSuffix } from '@/shared/lib/utils'
 import { Calendar, Users, Plus, X, Phone, MessageCircle, Wallet, Star, CheckCircle, ArrowRight, Check, Minus, Pencil, MessageSquare } from 'lucide-react'
 import type { RideRequest } from '@/shared/types'
 
@@ -419,6 +419,16 @@ export default function MyRidesPage() {
       Date.now() - new Date(ride.departure_time).getTime() > CLOSURE_GRACE_MS
   )
 
+  // The Driving tab: rides still in play (Active/Full) first, soonest departure first — then
+  // finished ones (Completed/Cancelled) below, most recently departed first, so a done ride
+  // never outranks one still coming up just because its departure time happens to be earlier.
+  const isRideFinished = (ride: RideWithBookings) => ride.status === 'completed' || ride.status === 'cancelled'
+  const sortedMyRides = [...myRides].sort((a, b) => {
+    if (isRideFinished(a) !== isRideFinished(b)) return isRideFinished(a) ? 1 : -1
+    const direction = isRideFinished(a) ? -1 : 1 // finished: newest first; not finished: soonest first
+    return direction * (new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime())
+  })
+
   return (
     <div className="min-h-full bg-background pb-8">
       {/* Header */}
@@ -464,13 +474,13 @@ export default function MyRidesPage() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full">
               <TabsTrigger value="bookings" className="flex-1">
-                My Bookings ({myBookings.length})
+                Bookings{countSuffix(myBookings.length)}
               </TabsTrigger>
               <TabsTrigger value="requests" className="flex-1">
-                Requests ({myRequests.length})
+                Requests{countSuffix(myRequests.length)}
               </TabsTrigger>
               <TabsTrigger value="driving" className="flex-1">
-                Driving ({myRides.length})
+                Driving{countSuffix(myRides.length)}
               </TabsTrigger>
             </TabsList>
 
@@ -717,7 +727,7 @@ export default function MyRidesPage() {
                 </Card>
               ) : (
                 <div className="grid grid-cols-1 gap-3">
-                {myRides.map((ride) => (
+                {sortedMyRides.map((ride) => (
                   <Card key={ride.id} className={previewClass(ride.id)} onClick={previewOnMap(ride)}>
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start mb-3">
@@ -928,9 +938,13 @@ export default function MyRidesPage() {
 
                       {(ride.status === 'active' || ride.status === 'full') &&
                         new Date(ride.departure_time) <= new Date() && (
-                        <div className="mt-4 pt-4 border-t flex gap-2">
+                        // Stacked, not side by side: this sits inside a panel that's never wider
+                        // than 420px (phone sheet or desktop side panel alike), and these two
+                        // labels don't fit next to each other at that width without cutting off
+                        // — a viewport breakpoint wouldn't help either, since the panel's own
+                        // width doesn't track the screen's.
+                        <div className="mt-4 pt-4 border-t flex flex-col gap-2">
                           <Button
-                            className="flex-1"
                             loading={completingRideId === ride.id}
                             onClick={() => handleMarkRideCompleted(ride.id)}
                           >
@@ -939,7 +953,7 @@ export default function MyRidesPage() {
                           </Button>
                           <Button
                             variant="outline"
-                            className="flex-1 text-destructive hover:text-destructive"
+                            className="text-destructive hover:text-destructive"
                             onClick={() => setCancelDialog({ type: 'ride_didnt_happen', id: ride.id })}
                           >
                             Didn't happen

@@ -1,6 +1,9 @@
 # Trips and seats
 
-Seat controls need migration [`09_seat_controls.sql`](../supabase/migrations/09_seat_controls.sql).
+Seat controls need migration [`09_seat_controls.sql`](../supabase/migrations/09_seat_controls.sql), and
+[`16_fix_departure_check.sql`](../supabase/migrations/16_fix_departure_check.sql) — without it, adjusting seats or
+ticking someone picked up fails outright on any ride more than an hour past its departure time (a bug in the base
+schema, not in this feature).
 
 ## How seats work
 
