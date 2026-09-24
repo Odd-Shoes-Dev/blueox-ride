@@ -16,14 +16,23 @@ the map or asks for the user's location again.
   - **Larger screens:** the panel-close button in its corner, or the **edge tab** (`‹` / `›`) on the panel's right
     edge, hides it; the same tab (now at the screen's left edge) or the menu pill by the logo brings it back.
   - **Phones:** the sheet has three heights — **peek** (just a title bar above the bottom nav, map almost full
-    screen), **half** and **full**. Drag the handle up or down, or tap it, to move between them. A new screen
-    opens at half. The map is sized to whatever the sheet leaves (`MapShell` owns the height; `MapPanel` draws it;
-    the peek bar is 3.5rem in both places, so change them together).
+    screen), **half** and **full**. Drag the handle up or down, or tap it, to move between them. A small drag (past
+    30px) nudges one step; a bigger, deliberate pull (past 120px) skips straight to the end — full from anywhere
+    pulling up, peek from anywhere pulling down — so pulling all the way down from full reaches peek in one
+    continuous gesture instead of needing a second drag to get past half (`NUDGE_PX`/`PULL_PX` in `MapPanel.tsx`).
+    The handle's own touch target is taller than it looks at half/full (no title row there to pad it out like at
+    peek), so it's not a thin strip to land a thumb on — dragging only works from that handle, not the panel's
+    content below it. A new screen opens at half. The map is sized to whatever the sheet leaves (`MapShell` owns
+    the height; `MapPanel` draws it; the peek bar is 3.5rem in both places, so change them together).
 - **Minimising a panel brings back the search card.** The "Where are you going?" card (`TripSearchStack`) is shown
   by the home screen, and by any panel screen whose panel is hidden (larger screens) or at a peek (phones), so the
   way back to searching is to slide the panel away, and expanding it returns to the screen you left, with its form
   intact. It's the same card and the same trip (the shell holds pickup and destination). It stays off while a
-  panel is half or fully open, where it would crowd the map.
+  panel is half or fully open, where it would crowd the map — and **for the whole duration of a live trip**
+  (driving or following one), since searching for a different ride doesn't make sense mid-trip, and on a phone it
+  was crowding the trip bar for the same strip of screen. The separate route-preview chip (for a route looked at
+  earlier, distinct from the trip itself) is hidden for the same reason and the same duration — the trip bar
+  already owns "which route you're on" while a trip is running.
 
 ## Shared map state
 

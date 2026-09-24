@@ -132,3 +132,20 @@ range at all.
 that only shows days with at least one matching ride as selectable, greying out the rest — so every day it's
 possible to pick is guaranteed to show something.
 
+---
+
+## 13. Let a driver collapse the search card manually
+
+**Status:** not started, and not clearly worth building — noted so the idea isn't lost, not because it's agreed
+on. Raised while fixing a real, concrete problem: on a phone with the panel minimised, the "Where are you going?"
+search card was showing (and duplicating its own route chip) during a live trip, crowding out the map exactly
+when a driving driver needed to see it most. That case is fixed outright — the search card no longer shows at
+all while a live trip is running, automatically, no button needed (see [map-shell.md](map-shell.md)).
+
+**The idea, if it turns out to still be wanted.** A manual show/hide toggle for the search card in general (not
+just during a trip), for anyone who wants the map back at some other moment. Deliberately not built now: it's a
+new control to notice and remember, with its own state to design (does "collapsed" reset per screen, stay
+collapsed until reopened, survive a refresh?) — real cost, for a problem that hasn't actually shown up outside
+the live-trip case the direct fix already covers. Worth reconsidering only if a genuine non-trip example turns
+up, not as a general "just in case" control.
+

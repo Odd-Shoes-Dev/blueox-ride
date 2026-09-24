@@ -27,6 +27,12 @@ const LOWER: Record<SheetSnap, SheetSnap> = { full: 'half', half: 'peek', peek: 
 // A tap goes to the next taller height, or from full back down to half.
 const TAPPED: Record<SheetSnap, SheetSnap> = { peek: 'half', half: 'full', full: 'half' }
 
+// A small drag nudges one step (full <-> half <-> peek); a big, deliberate pull skips straight
+// to the end, so pulling all the way down from full reaches peek in one continuous gesture
+// instead of needing a second drag to get past half.
+const NUDGE_PX = 30
+const PULL_PX = 120
+
 // Where a screen opens on top of the persistent map: a left-hand side panel on
 // larger screens (like Google Maps), and a bottom sheet on phones that can be
 // dragged (or tapped) between peek, half and full height.
@@ -50,8 +56,10 @@ export function MapPanel({
     if (dragStartY.current === null) return
     const dy = e.clientY - dragStartY.current
     dragStartY.current = null
-    if (dy < -30) onSnapChange(HIGHER[snap])
-    else if (dy > 30) onSnapChange(LOWER[snap])
+    if (dy <= -PULL_PX) onSnapChange('full')
+    else if (dy < -NUDGE_PX) onSnapChange(HIGHER[snap])
+    else if (dy >= PULL_PX) onSnapChange('peek')
+    else if (dy > NUDGE_PX) onSnapChange(LOWER[snap])
     else onSnapChange(TAPPED[snap])
   }
 
@@ -94,7 +102,13 @@ export function MapPanel({
         tabIndex={0}
         aria-label={snap === 'peek' ? `Show ${title}` : snap === 'half' ? 'Expand panel' : 'Shrink panel'}
       >
-        <div className="h-6 flex items-center justify-center">
+        {/* Taller than just enough to fit the pill at half/full, where there's no title row
+            alongside it to pad the touch target out — otherwise the grab zone shrinks to a
+            thin, hard-to-land strip exactly when pulling down from full is what's wanted. Kept
+            at its original height while peeking: the title row below already makes that zone
+            plenty big, and peek's container is a fixed h-14 (3.5rem, matched in MapShell's map
+            height) that a taller row here would overflow. */}
+        <div className={cn('flex items-center justify-center', snap === 'peek' ? 'h-6' : 'h-10')}>
           <div className="w-10 h-1.5 rounded-full bg-muted-foreground/40" />
         </div>
         {snap === 'peek' && (
