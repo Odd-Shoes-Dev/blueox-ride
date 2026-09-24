@@ -21,6 +21,8 @@ There is no automated migration runner in this project — apply each file manua
 | 13 | `13_ride_editing.sql` | Lets a driver edit their own ride (route, date/time, price, seats, notes, car details) via a new Edit Ride page, but locks route/date/time/price/seats once the ride has a booking or an adjusted seat (`guard_ride_edit` trigger). Notes and car details always stay editable. See `docs/ride-editing.md`. |
 | 14 | `14_ride_request_visibility.sql` | Restricts browsing open ride requests to signed-in users (it had no such check before). See `docs/ride-requests.md`. |
 | 15 | `15_always_ask_driver.sql` | Removes the instant-booking path entirely: every booking on a driver-posted ride now goes through the driver as a request (revokes `book_ride()`'s grant), raises the per-ride attempt limit from 3 to 4, and a request now expires at the ride's departure time instead of a fixed 2 hours. See `docs/booking-requests.md`. |
+| 16 | `16_fix_departure_check.sql` | **Bug fix, run promptly.** `01_schema.sql`'s `valid_departure` check re-validated on every update, not just when a ride was created — so any update to a ride more than an hour past departure (marking it completed, "Didn't happen", adjusting seats, ticking someone picked up) failed outright. Replaced with a trigger that only checks departure_time when it's actually being set. |
+| 17 | `17_fix_ride_request_departure_check.sql` | **Bug fix, run promptly.** Same bug as 16, on `07_ride_requests.sql`'s `valid_request_departure` check — withdrawing an old, never-matched "I need a ride" post failed outright once its departure passed. Same fix. |
 
 ## Verifying a step worked
 

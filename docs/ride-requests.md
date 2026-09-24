@@ -1,7 +1,10 @@
 # Ride requests (passenger-posted demand)
 
-Needs migrations [`07_ride_requests.sql`](../supabase/migrations/07_ride_requests.sql) and
-[`14_ride_request_visibility.sql`](../supabase/migrations/14_ride_request_visibility.sql).
+Needs migrations [`07_ride_requests.sql`](../supabase/migrations/07_ride_requests.sql),
+[`14_ride_request_visibility.sql`](../supabase/migrations/14_ride_request_visibility.sql), and
+[`17_fix_ride_request_departure_check.sql`](../supabase/migrations/17_fix_ride_request_departure_check.sql) —
+without it, withdrawing an old, never-matched request fails outright once its departure time is more than an
+hour past (a bug in the base schema, the same one fixed for rides in migration 16).
 
 Not to be confused with [booking-requests.md](booking-requests.md) (a rider asking a specific
 driver for a seat on their ride). A ride request is the other direction: a rider posts what they
