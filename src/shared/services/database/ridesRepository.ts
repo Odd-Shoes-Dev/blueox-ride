@@ -249,6 +249,25 @@ export async function updateRide(
   return { error: error as Error | null }
 }
 
+export interface ConfirmedPassenger {
+  id: string
+  full_name: string
+}
+
+// Who the driver would see live-sharing markers for on a trip — confirmed passengers only, and
+// only relevant while app_settings.passenger_location_sharing_enabled is on (the channel itself
+// is also gated server-side; this is just who to open a listener for).
+export async function getConfirmedPassengers(rideId: string): Promise<ConfirmedPassenger[]> {
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('passenger:users(id, full_name)')
+    .eq('ride_id', rideId)
+    .eq('status', 'confirmed')
+
+  if (error) throw error
+  return (data ?? []).map((row) => row.passenger as unknown as ConfirmedPassenger)
+}
+
 export async function getRidesForDriver(driverId: string): Promise<RideWithBookings[]> {
   const { data, error } = await supabase
     .from('rides')

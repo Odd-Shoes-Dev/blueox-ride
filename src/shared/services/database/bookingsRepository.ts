@@ -13,6 +13,26 @@ export async function getActiveBookingForRide(rideId: string, passengerId: strin
   return (data as Booking) ?? null
 }
 
+// Watches one booking for the driver ticking "Picked up" — used to stop a passenger's own live
+// location share automatically once they're in the car (migration 21 adds bookings to the
+// realtime publication for this). Returns an unsubscribe function.
+export function subscribeToBookingPickedUp(bookingId: string, onPickedUp: () => void): () => void {
+  const channel = supabase
+    .channel(`booking-picked-up-${bookingId}`)
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'bookings', filter: `id=eq.${bookingId}` },
+      ({ new: row }) => {
+        if ((row as { picked_up_at: string | null }).picked_up_at) onPickedUp()
+      }
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}
+
 // There used to be an instant-booking path here (book_ride, migration 08). Since migration 15
 // every booking goes through bookingRequestsRepository.requestBooking() instead — the driver
 // always accepts before a booking exists — so this no longer has a client. The database

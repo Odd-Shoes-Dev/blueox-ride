@@ -22,8 +22,15 @@ function channelName(rideId: string): string {
   return `ride-location-${rideId}`
 }
 
-function openPrivateChannel(rideId: string): RealtimeChannel {
-  return supabase.channel(channelName(rideId), { config: { private: true } })
+// A passenger's own share with the driver — one channel per (ride, passenger) pair, not one
+// shared per ride, so a passenger's position is never visible to any other passenger (migration
+// 21). Off unless app_settings.passenger_location_sharing_enabled is on; see AppSettingsContext.
+function passengerChannelName(rideId: string, passengerId: string): string {
+  return `ride-passenger-${rideId}-${passengerId}`
+}
+
+function openPrivateChannel(name: string): RealtimeChannel {
+  return supabase.channel(name, { config: { private: true } })
 }
 
 // Private channels need the signed-in user's token on the realtime connection *before*
@@ -50,7 +57,7 @@ export interface LocationBroadcaster {
 
 // Driver side: call send() periodically while sharing; stop() when done.
 export function createLocationBroadcaster(rideId: string): LocationBroadcaster {
-  const channel = openPrivateChannel(rideId)
+  const channel = openPrivateChannel(channelName(rideId))
   let stopped = false
   void joinWhenAuthorised(channel, () => stopped)
 
@@ -75,7 +82,50 @@ export function subscribeToDriverLocation(
   rideId: string,
   onUpdate: (location: DriverLocationUpdate) => void
 ): () => void {
-  const channel = openPrivateChannel(rideId)
+  const channel = openPrivateChannel(channelName(rideId))
+  let stopped = false
+
+  channel.on('broadcast', { event: 'location' }, ({ payload }) => {
+    onUpdate(payload as DriverLocationUpdate)
+  })
+  void joinWhenAuthorised(channel, () => stopped)
+
+  return () => {
+    stopped = true
+    supabase.removeChannel(channel)
+  }
+}
+
+// Passenger side: call send() periodically while sharing with the driver; stop() when done.
+export function createPassengerLocationBroadcaster(rideId: string, passengerId: string): LocationBroadcaster {
+  const channel = openPrivateChannel(passengerChannelName(rideId, passengerId))
+  let stopped = false
+  void joinWhenAuthorised(channel, () => stopped)
+
+  return {
+    send: (location) => {
+      channel.send({
+        type: 'broadcast',
+        event: 'location',
+        payload: { ...location, timestamp: Date.now() },
+      })
+    },
+    stop: () => {
+      stopped = true
+      supabase.removeChannel(channel)
+    },
+  }
+}
+
+// Driver side (or the passenger's own other tab): subscribes to one passenger's live position.
+// Returns an unsubscribe function. Silence forever just means that passenger never opted in —
+// there's no separate "did they say yes" signal to check first.
+export function subscribeToPassengerLocation(
+  rideId: string,
+  passengerId: string,
+  onUpdate: (location: DriverLocationUpdate) => void
+): () => void {
+  const channel = openPrivateChannel(passengerChannelName(rideId, passengerId))
   let stopped = false
 
   channel.on('broadcast', { event: 'location' }, ({ payload }) => {

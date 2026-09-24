@@ -37,6 +37,9 @@ interface HeroLiveMapProps {
   // Ride Requests page is open. Tapping one calls onSelectRequest with its id.
   requests?: HeroRideRequest[]
   onSelectRequest?: (requestId: string) => void
+  // Confirmed passengers currently sharing their own position back, shown to the driver during
+  // their own live trip (see usePassengerLocationSharing / useLiveTrip's passengerPositions).
+  passengers?: { id: string; name: string; lat: number; lng: number }[]
   // A ride's road route (own next ride, or the pin the user tapped) with its end pin
   featured?: {
     rideId: string
@@ -124,6 +127,28 @@ const requestIcon = L.divIcon({
   iconSize: [22, 22],
   iconAnchor: [11, 22],
 })
+
+// A passenger currently sharing their own position back, shown to the driver during a trip as a
+// small avatar — same visual language as the initials avatars used elsewhere in the app (My
+// Rides' passenger list, the corner account button). `name` is someone's own profile name, so it
+// goes through a strict allow-list (letters/digits only) before it ever reaches raw HTML — not
+// just escaped, restricted, since this is the only marker that interpolates user-controlled text.
+function makePassengerIcon(name: string): L.DivIcon {
+  const initials = name.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 2) || '?'
+  return L.divIcon({
+    className: 'hero-passenger-marker',
+    html: `<div style="
+      width: 28px; height: 28px; border-radius: 50%;
+      background: #FFEDD5;
+      border: 2.5px solid white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.35);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: #193153;
+    ">${initials}</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  })
+}
 
 // The two ends of a previewed ride's route. Small dots, so they don't get confused with the
 // searcher's own pickup/destination pins (which are shown at the same time).
@@ -456,6 +481,7 @@ export function HeroLiveMap({
   rides,
   myRides = [],
   requests = [],
+  passengers = [],
   onSelectRequest,
   featured = null,
   onSelectRide,
@@ -790,6 +816,20 @@ export function HeroLiveMap({
               </Popup>
             </Marker>
           ))}
+
+        {passengers.map((passenger) => (
+          <Marker
+            key={`pax-${passenger.id}`}
+            position={[passenger.lat, passenger.lng]}
+            icon={makePassengerIcon(passenger.name)}
+            zIndexOffset={1200}
+          >
+            <Popup>
+              <p className="text-sm font-medium">{passenger.name}</p>
+              <p className="text-xs text-muted-foreground">Sharing their location</p>
+            </Popup>
+          </Marker>
+        ))}
       </MapContainer>
 
       {editing && map && (

@@ -21,5 +21,7 @@ export * as bookingRequestsRepository from './bookingRequestsRepository'
 export {
   createLocationBroadcaster,
   subscribeToDriverLocation,
+  createPassengerLocationBroadcaster,
+  subscribeToPassengerLocation,
 } from './locationRepository'
 export type { DriverLocationUpdate, LocationBroadcaster } from './locationRepository'

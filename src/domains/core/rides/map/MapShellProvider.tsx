@@ -4,7 +4,9 @@ import { ridesRepository, withTimeout, RequestTimeoutError } from '@/shared/serv
 import { reverseGeocode } from '@/shared/services/geocoding'
 import { getRoute } from '@/shared/services/routing'
 import { useAuth } from '@/domains/core/auth/AuthContext'
+import { usePayments } from '@/shared/contexts/AppSettingsContext'
 import { useLiveTrip } from '@/domains/core/rides/hooks/useLiveTrip'
+import { usePassengerLocationSharing } from '@/domains/core/rides/hooks/usePassengerLocationSharing'
 import { haversineKm } from '@/domains/core/rides/lib/routeProgress'
 import { DEFAULT_SEARCH_RADIUS_KM } from '@/domains/core/rides/map/searchConstants'
 import { toLocalDateInput } from '@/shared/lib/utils'
@@ -110,8 +112,14 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
   const [activePreview, setActivePreview] = useState<PreviewableRide | null>(null)
   const previewRide = useCallback((ride: PreviewableRide | null) => setActivePreview(ride), [])
 
+  const { passengerLocationSharingEnabled } = usePayments()
+
   // ---- Live trip (driving it, or following the driver) ----
-  const live = useLiveTrip()
+  const live = useLiveTrip(passengerLocationSharingEnabled)
+  // The other direction: sharing this user's own position back, as a passenger, on whichever
+  // upcoming ride's driver starts a trip first. Independent of `live` above — it runs in the
+  // background regardless of which screen is open, not tied to actively following one ride.
+  const passengerShare = usePassengerLocationSharing(userId ?? null, passengerLocationSharingEnabled)
   const { startDriverTrip: beginDriverTrip, watchDriver: beginWatching } = live
   // Starting a trip also puts the ride's route on the map, so its progress has a line to follow.
   const startDriverTrip = useCallback(
@@ -438,6 +446,13 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
       startDriverTrip,
       watchDriver,
       stopLiveTrip: live.stopLiveTrip,
+      passengerPositions: live.passengerPositions,
+      passengerSharePrompt: passengerShare.prompt,
+      acceptSharePrompt: passengerShare.acceptPrompt,
+      declineSharePrompt: passengerShare.declinePrompt,
+      sharingLocationRideId: passengerShare.sharingRideId,
+      stopSharingLocation: passengerShare.stopSharing,
+      shareLocationError: passengerShare.shareError,
       focus,
       focusOn,
       reportMapCenter,
@@ -481,6 +496,13 @@ export function MapShellProvider({ children }: { children: ReactNode }) {
       live.livePosition,
       live.liveError,
       live.stopLiveTrip,
+      live.passengerPositions,
+      passengerShare.prompt,
+      passengerShare.acceptPrompt,
+      passengerShare.declinePrompt,
+      passengerShare.sharingRideId,
+      passengerShare.stopSharing,
+      passengerShare.shareError,
       tripRoute,
       tripSeats,
       adjustTripSeats,

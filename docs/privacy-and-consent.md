@@ -1,7 +1,9 @@
 # Privacy and consent
 
 Needs migrations [`11_consent.sql`](../supabase/migrations/11_consent.sql) and
-[`12_private_live_location.sql`](../supabase/migrations/12_private_live_location.sql).
+[`12_private_live_location.sql`](../supabase/migrations/12_private_live_location.sql). See also
+[passenger-location-sharing.md](passenger-location-sharing.md) (migration 21) — built, but left off by default,
+for the reason explained there.
 
 ## What it is
 
@@ -19,12 +21,13 @@ Three things that keep people's information handled openly and safely:
 | | Driver | Confirmed passenger | Anyone else |
 |---|---|---|---|
 | Driver's live position | Own | Yes, while the trip runs | No (refused by the server) |
-| A passenger's live position | No | No | No |
+| A passenger's live position | Only if that passenger opted in, and only that driver's own passengers | Own only, never another passenger's | No |
 | Where a passenger chose to get in/off (a point they picked, not where they are) | Yes | Own only | No |
 | A ride's start and end | Yes | Yes | Yes (public) |
 
-The driver's position is relayed live every 5 seconds and is **never stored**. Passenger live sharing is not built
-yet — see [future-ideas.md](future-ideas.md).
+Both directions are relayed live every 5 seconds and are **never stored**. Passenger sharing exists in the code
+but is **off by default** — see [passenger-location-sharing.md](passenger-location-sharing.md) — until the company
+is registered as a data controller, not just as a business.
 
 ## Agreement (consent)
 
@@ -40,7 +43,11 @@ yet — see [future-ideas.md](future-ideas.md).
   people out.
 
 An agreement screen is good practice and evidence of consent, but it doesn't replace legal duties such as
-registering with Uganda's Personal Data Protection Office. Registration is an open item to settle with a lawyer.
+registering with Uganda's Personal Data Protection Office — confirmed directly against the Act and a real 2025
+enforcement case (Uganda's regulator found Google in breach for not registering, despite Google's own data
+collection already running on consent). Registration is a separate, mandatory requirement, not an alternative to
+consent. See [passenger-location-sharing.md](passenger-location-sharing.md#why-it-stays-off-consent-doesnt-substitute-for-registration)
+for what the process itself involves.
 
 ## Private live-location channel
 

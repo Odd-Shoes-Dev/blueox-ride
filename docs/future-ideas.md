@@ -90,36 +90,7 @@ payouts (they are recorded automatically but paid by hand from the admin page).
 
 ---
 
-## 11. Passenger live location for the driver
-
-**Status:** designed, not built. Needs the consent work in [privacy-and-consent.md](privacy-and-consent.md) first (done),
-and a legal check before switching on. Build it behind an `app_settings` switch (OFF) like the payments one.
-
-**The idea.** When a driver starts a trip, each passenger with a confirmed booking is asked once: *"Allow the driver to
-see your location?"* They can say no, and can change their mind any time while the trip runs (a "Sharing with
-<driver> — Stop" control on the trip bar and the ride page). The driver then sees a dot for each passenger who chose to
-share, with their first name and distance, so roadside pickups are easy.
-
-**Rules.**
-- Opt-in, per trip, never automatic; "no" is remembered for that trip and not asked again.
-- Only for passengers with a confirmed booking, and only while that ride's trip is running.
-- Stops by itself when the driver ticks **Picked up**, when the trip ends, or when the passenger stops it.
-- Relayed live over a private channel, never stored.
-
-**Needs.**
-- A passenger topic such as `ride-passenger-<ride id>-<user id>`: only that passenger (confirmed booking) may send;
-  only the ride's driver (and that passenger) may receive — another rule in `realtime.messages`.
-- Knowing a trip has started when the passenger opens the app later: trips aren't stored, only broadcast, so the
-  passenger app would listen, in the background, on the private channels of its upcoming confirmed rides and prompt when
-  the driver's first update arrives. (With no push notifications, nothing prompts while the app is closed.)
-- A driver-side layer on the map and trip bar; the "Sharing" indicator for the passenger; wording in the Privacy
-  Policy and the consent screen.
-- The passenger's browser also asks for location permission, and the tab must stay open with the screen on, so it is
-  most useful in the minutes before pickup.
-
----
-
-## 12. Grey out individual days with no ride in the search date picker
+## 11. Grey out individual days with no ride in the search date picker
 
 **Status:** not started. Follow-up to the "Leaving on" date bounds on the search results page (see
 [map-shell.md](map-shell.md), already built): the plain browser `<input type="date">` used there can only
@@ -134,7 +105,7 @@ possible to pick is guaranteed to show something.
 
 ---
 
-## 13. Let a driver collapse the search card manually
+## 12. Let a driver collapse the search card manually
 
 **Status:** not started, and not clearly worth building — noted so the idea isn't lost, not because it's agreed
 on. Raised while fixing a real, concrete problem: on a phone with the panel minimised, the "Where are you going?"
