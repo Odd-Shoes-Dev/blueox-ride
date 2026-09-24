@@ -7,6 +7,8 @@ import { MapPlaceSearch } from '@/domains/core/rides/components/MapPlaceSearch'
 import { MapShellProvider } from '@/domains/core/rides/map/MapShellProvider'
 import { useMapShell } from '@/domains/core/rides/map/MapShellContext'
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar'
+import { Button } from '@/shared/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/dialog'
 import { cn } from '@/shared/lib/utils'
 import { RoutePreviewChip } from '@/domains/core/rides/components/RoutePreviewChip'
 import { TripBar } from '@/domains/core/rides/components/TripBar'
@@ -135,6 +137,7 @@ function MapShellLayout({ panels }: MapShellProps) {
         myRides={shell.myRides}
         requests={shell.requestPins ?? []}
         onSelectRequest={shell.selectRequest}
+        passengers={Object.values(shell.passengerPositions)}
         featured={isPanel && shell.featured?.isDefault ? null : shell.featured}
         onSelectRide={shell.selectRide}
         onDeselectRide={shell.deselectRide}
@@ -258,9 +261,31 @@ function MapShellLayout({ panels }: MapShellProps) {
             seats={shell.tripSeats}
             onAdjustSeats={shell.adjustTripSeats}
             onStop={shell.stopLiveTrip}
+            passengerSharing={shell.sharingLocationRideId === shell.liveTrip.ride.id}
+            onStopSharingLocation={shell.stopSharingLocation}
           />
         </div>
       )}
+
+      {/* Asked once, the moment a driver's trip starts, for every ride this passenger has a
+          confirmed seat on (see usePassengerLocationSharing) — not tied to any one screen. */}
+      <Dialog open={!!shell.passengerSharePrompt} onOpenChange={(open) => !open && shell.declineSharePrompt()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Share your live location?</DialogTitle>
+            <DialogDescription>
+              {shell.passengerSharePrompt?.driverName ?? 'Your driver'} just started this trip. They'll see your
+              position on the map until you're picked up, the trip ends, or you stop sharing.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={shell.declineSharePrompt}>
+              No thanks
+            </Button>
+            <Button onClick={shell.acceptSharePrompt}>Share my location</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* On panel screens the previewed route's chip sits at the top of the visible map.
           (On the home screen it's part of the search card's stack instead.) Hidden for the

@@ -16,6 +16,10 @@ interface TripBarProps {
   onAdjustSeats?: (delta: number) => Promise<void>
   onStop: () => void
   className?: string
+  // Passenger only: whether they're currently sharing their own position back, and a way to stop
+  // (off, unless app_settings.passenger_location_sharing_enabled is on — see AppSettingsContext)
+  passengerSharing?: boolean
+  onStopSharingLocation?: () => void
 }
 
 const OFF_ROUTE_DRIVER_M = 200 // warn the driver they've left the planned road
@@ -36,7 +40,18 @@ function useNow(intervalMs: number): number {
 // Live status for a trip on the map: how far is left, roughly how long, and whether
 // the vehicle is off the planned route. Drivers get an "End trip" button; passengers
 // can stop following. Sits over the map so it's visible with every panel closed.
-export function TripBar({ trip, position, route, error, seats, onAdjustSeats, onStop, className }: TripBarProps) {
+export function TripBar({
+  trip,
+  position,
+  route,
+  error,
+  seats,
+  onAdjustSeats,
+  onStop,
+  className,
+  passengerSharing,
+  onStopSharingLocation,
+}: TripBarProps) {
   const isDriver = trip.role === 'driver'
   const [seatBusy, setSeatBusy] = useState(false)
   const [seatError, setSeatError] = useState<string | null>(null)
@@ -138,6 +153,15 @@ export function TripBar({ trip, position, route, error, seats, onAdjustSeats, on
       <div className="mt-1 text-base">{headline}</div>
 
       {isDriver && !error && <p className="mt-0.5 text-xs text-navy-900/60">Sharing live with your passengers · screen stays on</p>}
+      {!isDriver && passengerSharing && (
+        <button
+          type="button"
+          onClick={onStopSharingLocation}
+          className="mt-0.5 text-xs text-navy-900/60 underline decoration-navy-900/30 hover:text-navy-900"
+        >
+          Sharing your location with the driver — Stop
+        </button>
+      )}
       {staleMinutes !== null && (
         <p className="mt-0.5 text-xs text-navy-900/60">Driver's position last updated {staleMinutes} min ago</p>
       )}

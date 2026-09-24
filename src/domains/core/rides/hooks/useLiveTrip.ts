@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   createLocationBroadcaster,
   subscribeToDriverLocation,
+  subscribeToPassengerLocation,
+  ridesRepository,
   type LocationBroadcaster,
 } from '@/shared/services/database'
 import type { LivePosition, LiveTrip, PreviewableRide } from '@/domains/core/rides/map/MapShellContext'
@@ -11,16 +13,31 @@ import { bearingDegrees, haversineKm } from '@/domains/core/rides/lib/routeProgr
 // every GPS fix; only the broadcast is throttled (no need to flood the channel).
 const BROADCAST_INTERVAL_MS = 5000
 
+// A passenger sharing their own position back, as seen by the driver during their trip.
+export interface PassengerPosition {
+  id: string
+  name: string
+  lat: number
+  lng: number
+  updatedAt: number
+}
+
 // A "trip" the app is following live, for as long as the user wants:
 //  - as the DRIVER: read GPS continuously, share it with passengers, keep the
 //    screen awake so the phone doesn't stop reporting when it dims;
 //  - as a PASSENGER: follow the driver's shared position.
 // It lives in the app's shared map state (not on the ride page), so it keeps
 // running when the ride panel is closed and the map is all you're looking at.
-export function useLiveTrip() {
+//
+// `passengerLocationSharingEnabled` (app_settings, see AppSettingsContext): while on, starting a
+// trip as the driver also opens a read-only listener on each confirmed passenger's own share —
+// silence from someone who never opted in just means no marker for them, there's no separate
+// "did they say yes" signal to check first (see usePassengerLocationSharing, the other side).
+export function useLiveTrip(passengerLocationSharingEnabled: boolean) {
   const [liveTrip, setLiveTrip] = useState<LiveTrip | null>(null)
   const [livePosition, setLivePosition] = useState<LivePosition | null>(null)
   const [liveError, setLiveError] = useState<string | null>(null)
+  const [passengerPositions, setPassengerPositions] = useState<Record<string, PassengerPosition>>({})
 
   const liveTripRef = useRef<LiveTrip | null>(null)
   const watchIdRef = useRef<number | null>(null)
@@ -29,6 +46,8 @@ export function useLiveTrip() {
   const lastSendRef = useRef(0)
   const lastFixRef = useRef<{ lat: number; lng: number } | null>(null)
   const lastHeadingRef = useRef<number | undefined>(undefined)
+  // Listeners on confirmed passengers' own shares, while driving a trip.
+  const passengerUnsubscribersRef = useRef<Map<string, () => void>>(new Map())
 
   // Which way the vehicle is pointing. GPS reports a heading only while moving (and
   // not on every device), so otherwise work it out from the last two positions, and
@@ -59,6 +78,9 @@ export function useLiveTrip() {
     liveTripRef.current = null
     lastFixRef.current = null
     lastHeadingRef.current = undefined
+    for (const stop of passengerUnsubscribersRef.current.values()) stop()
+    passengerUnsubscribersRef.current.clear()
+    setPassengerPositions({})
   }, [])
 
   const stopLiveTrip = useCallback(() => {
@@ -121,8 +143,36 @@ export function useLiveTrip() {
         },
         { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 }
       )
+
+      // Listen for whichever confirmed passengers chose to share back — see the note on
+      // useLiveTrip above. Fetched once per trip start, not kept in sync afterward: someone
+      // confirmed mid-trip (rare — seats close once a trip starts) wouldn't get a listener
+      // until the next trip.
+      if (passengerLocationSharingEnabled) {
+        ridesRepository
+          .getConfirmedPassengers(ride.id)
+          .then((passengers) => {
+            if (liveTripRef.current !== trip) return // trip already ended/changed
+            for (const passenger of passengers) {
+              const stop = subscribeToPassengerLocation(ride.id, passenger.id, (update) => {
+                setPassengerPositions((prev) => ({
+                  ...prev,
+                  [passenger.id]: {
+                    id: passenger.id,
+                    name: passenger.full_name,
+                    lat: update.lat,
+                    lng: update.lng,
+                    updatedAt: Date.now(),
+                  },
+                }))
+              })
+              passengerUnsubscribersRef.current.set(passenger.id, stop)
+            }
+          })
+          .catch((error) => console.error('Could not check for sharing passengers:', error))
+      }
     },
-    [teardown, resolveHeading]
+    [teardown, resolveHeading, passengerLocationSharingEnabled]
   )
 
   const watchDriver = useCallback(
@@ -187,5 +237,5 @@ export function useLiveTrip() {
   // Nothing keeps running once the app itself is gone.
   useEffect(() => teardown, [teardown])
 
-  return { liveTrip, livePosition, liveError, startDriverTrip, watchDriver, stopLiveTrip }
+  return { liveTrip, livePosition, liveError, passengerPositions, startDriverTrip, watchDriver, stopLiveTrip }
 }

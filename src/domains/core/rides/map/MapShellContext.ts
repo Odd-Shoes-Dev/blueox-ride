@@ -3,6 +3,8 @@ import type { ridesRepository } from '@/shared/services/database'
 import type { PinKind } from '@/domains/core/rides/components/mapPins'
 import type { PlacedPoint } from '@/domains/core/rides/components/PinPlacer'
 import type { RideRequest } from '@/shared/types'
+import type { PassengerPosition } from '@/domains/core/rides/hooks/useLiveTrip'
+import type { PendingSharePrompt } from '@/domains/core/rides/hooks/usePassengerLocationSharing'
 
 // Shared state for the persistent map that sits behind every screen (see
 // app/MapShell). It lives here, in the rides domain, so pages and components
@@ -157,6 +159,18 @@ export interface MapShellValue {
   startDriverTrip: (ride: PreviewableRide) => void
   watchDriver: (ride: PreviewableRide) => void
   stopLiveTrip: () => void
+  // Driver side: confirmed passengers currently sharing their own position back (empty unless
+  // app_settings.passenger_location_sharing_enabled is on — see docs/privacy-and-consent.md).
+  passengerPositions: Record<string, PassengerPosition>
+  // Passenger side: the one-time "allow the driver to see your location?" ask, triggered by the
+  // driver's first live update on a ride this passenger has a confirmed seat on — and the
+  // controls for the share itself, once accepted.
+  passengerSharePrompt: PendingSharePrompt | null
+  acceptSharePrompt: () => void
+  declineSharePrompt: () => void
+  sharingLocationRideId: string | null
+  stopSharingLocation: () => void
+  shareLocationError: string | null
 
   // Move the map somewhere (place search results); report/read the map's current centre
   focus: { lat: number; lng: number } | null

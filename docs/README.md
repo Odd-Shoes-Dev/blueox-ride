@@ -13,6 +13,7 @@ when a feature changes, update its page in the same change.
 | [trips-and-seats.md](trips-and-seats.md) | Live trip mode, and how drivers keep the seat count true (seats, "picked up", no-shows) |
 | [ride-editing.md](ride-editing.md) | Editing a posted ride (locks once it has a booking), and cancelling |
 | [privacy-and-consent.md](privacy-and-consent.md) | Agreeing to the Terms/Privacy Policy (recorded), who can see whose location, the private live-location channel |
+| [passenger-location-sharing.md](passenger-location-sharing.md) | A passenger sharing their live location back with their driver — built, but **off by default** until the company is registered as a data controller |
 | [map-shell.md](map-shell.md) | How the app is built around one persistent map with panels on top |
 | [future-ideas.md](future-ideas.md) | Ideas we have agreed on but not built yet, with enough detail to pick them up later |
 
