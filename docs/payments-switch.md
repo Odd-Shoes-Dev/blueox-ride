@@ -54,4 +54,8 @@ Drivers are paid in cash by passengers; the app never pays drivers.
 ## Bookings left unpaid from before
 
 Old bookings still waiting for payment aren't confirmed automatically (they could exceed a ride's seats).
-Their owners see **Confirm my seat — free** on the ride page.
+Their owners see **Confirm my seat — free** on the ride page and on My Rides' Bookings tab. A
+`pending_payment` booking has never actually held a seat (only a *confirmed* one does — see
+[trips-and-seats.md](trips-and-seats.md)), so it can also just be **withdrawn** from My Rides instead,
+whatever the ride's departure time — there's nothing to refund and no seat to give back, unlike cancelling an
+already-confirmed booking, which stays limited to before departure.

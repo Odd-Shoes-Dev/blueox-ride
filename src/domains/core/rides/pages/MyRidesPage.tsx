@@ -432,6 +432,11 @@ export default function MyRidesPage() {
     return direction * (new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime())
   })
 
+  // What the cancel dialog is actually about, when it's a booking — a pending-payment one never
+  // held a seat, so the usual "goes back to the driver" / refund wording doesn't apply to it.
+  const cancelDialogBooking =
+    cancelDialog?.type === 'booking' ? myBookings.find((b) => b.id === cancelDialog.id) : undefined
+
   return (
     <div className="min-h-full bg-background pb-8">
       {/* Header */}
@@ -585,8 +590,11 @@ export default function MyRidesPage() {
                           </>
                         )}
 
-                        {(booking.status === 'pending_payment' || booking.status === 'confirmed') &&
-                          new Date(booking.ride.departure_time) > new Date() && (
+                        {/* Pending payment never held a seat (only a *confirmed* booking does),
+                            so withdrawing one is a clean no-op whatever the departure time —
+                            unlike a confirmed booking, which can only be cancelled ahead of it. */}
+                        {(booking.status === 'pending_payment' ||
+                          (booking.status === 'confirmed' && new Date(booking.ride.departure_time) > new Date())) && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -993,9 +1001,11 @@ export default function MyRidesPage() {
                   : 'Passengers who booked this ride will see that it is cancelled.'
                 : cancelDialog?.type === 'request'
                 ? 'Drivers will no longer be able to accept this request.'
-                : paymentsEnabled
-                  ? 'Refund policy: Cancel more than 1 hour before departure for a full refund. Cancellations within 1 hour forfeit the booking fee to the driver.'
-                  : 'Your seat goes back to the driver so someone else can take it. Please let the driver know you can\'t make it.'}
+                : cancelDialogBooking?.status === 'pending_payment'
+                  ? "This was never confirmed, so there's nothing to refund — it will simply be withdrawn."
+                  : paymentsEnabled
+                    ? 'Refund policy: Cancel more than 1 hour before departure for a full refund. Cancellations within 1 hour forfeit the booking fee to the driver.'
+                    : 'Your seat goes back to the driver so someone else can take it. Please let the driver know you can\'t make it.'}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
