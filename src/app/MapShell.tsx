@@ -67,8 +67,11 @@ function MapShellLayout({ panels }: MapShellProps) {
   // searching: the map shows the same search card as the home screen, and expanding the
   // panel returns to the screen you left, unchanged. Hiding is desktop-only and peek is
   // phone-only, so each half of the condition only applies at its own screen size.
+  // Never during a live trip, though — searching for a different ride doesn't make sense while
+  // one is already running (driving it, or following it as a passenger), and it was clashing
+  // with the trip bar for the same small strip of screen on a phone.
   const peeking = sheetSnap === 'peek'
-  const showSearchCard = isPanel && (collapsed || peeking)
+  const showSearchCard = isPanel && (collapsed || peeking) && !shell.liveTrip
   const searchCardScreens = collapsed && peeking ? '' : collapsed ? 'max-md:hidden' : 'md:hidden'
   const routeChipHiddenOn = collapsed && peeking ? 'hidden' : collapsed ? 'md:hidden' : peeking ? 'max-md:hidden' : ''
 
@@ -260,8 +263,10 @@ function MapShellLayout({ panels }: MapShellProps) {
       )}
 
       {/* On panel screens the previewed route's chip sits at the top of the visible map.
-          (On the home screen it's part of the search card's stack instead.) */}
-      {isPanel && shell.previewedRide && !placingPin && !(shell.liveTrip && shell.liveTrip.ride.id === shell.previewedRide.id) && (
+          (On the home screen it's part of the search card's stack instead.) Hidden for the
+          whole duration of a live trip — not just when it happens to match — since the trip
+          bar already owns "which route you're on" while one is running. */}
+      {isPanel && shell.previewedRide && !placingPin && !shell.liveTrip && (
         <div
           className={cn(
             'fixed top-36 right-0 left-0 z-[43] flex justify-center px-3 pointer-events-none',
