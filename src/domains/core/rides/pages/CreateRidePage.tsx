@@ -12,7 +12,7 @@ import { usePayments } from '@/shared/contexts/AppSettingsContext'
 import { CarPhotoUpload } from '@/domains/core/rides/components/CarPhotoUpload'
 import { useToast } from '@/shared/hooks/use-toast'
 import { PageContainer } from '@/shared/components/PageContainer'
-import { formatCurrency, calculateBookingFee } from '@/shared/lib/utils'
+import { formatCurrency, calculateBookingFee, getErrorMessage } from '@/shared/lib/utils'
 import { ArrowLeft, Info, Car, Check } from 'lucide-react'
 import type { CarPhoto } from '@/shared/types'
 
@@ -166,7 +166,7 @@ export default function CreateRidePage() {
       console.error('Create ride error:', error)
       toast({
         title: 'Failed to create ride',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        description: getErrorMessage(error),
         variant: 'destructive',
       })
     }

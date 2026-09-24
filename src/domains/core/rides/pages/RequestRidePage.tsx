@@ -11,7 +11,7 @@ import { useMapPins } from '@/domains/core/rides/map/MapShellContext'
 import { usePayments } from '@/shared/contexts/AppSettingsContext'
 import { useToast } from '@/shared/hooks/use-toast'
 import { PageContainer } from '@/shared/components/PageContainer'
-import { formatCurrency } from '@/shared/lib/utils'
+import { formatCurrency, getErrorMessage } from '@/shared/lib/utils'
 import { ArrowLeft, Info } from 'lucide-react'
 
 interface Location {
@@ -110,7 +110,7 @@ export default function RequestRidePage() {
       console.error('Post request error:', error)
       toast({
         title: 'Failed to post request',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        description: getErrorMessage(error),
         variant: 'destructive',
       })
     }

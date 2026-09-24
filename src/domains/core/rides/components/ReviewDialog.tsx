@@ -5,7 +5,7 @@ import { Label } from '@/shared/ui/label'
 import { useToast } from '@/shared/hooks/use-toast'
 import { reviewsRepository } from '@/shared/services/database'
 import { Star } from 'lucide-react'
-import { cn } from '@/shared/lib/utils'
+import { cn, getErrorMessage } from '@/shared/lib/utils'
 
 interface ReviewDialogProps {
   open: boolean
@@ -57,7 +57,7 @@ export function ReviewDialog({
       console.error('Submit review error:', error)
       toast({
         title: 'Failed to submit review',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        description: getErrorMessage(error),
         variant: 'destructive',
       })
     }

@@ -10,7 +10,7 @@ import { Label } from '@/shared/ui/label'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/dialog'
 import { useToast } from '@/shared/hooks/use-toast'
 import { PageContainer } from '@/shared/components/PageContainer'
-import { formatCurrency, formatDate } from '@/shared/lib/utils'
+import { formatCurrency, formatDate, getErrorMessage } from '@/shared/lib/utils'
 import { usePayments } from '@/shared/contexts/AppSettingsContext'
 import type { RideRequest } from '@/shared/types'
 import { ArrowLeft, Calendar, Users, Wallet, MessageSquare } from 'lucide-react'
@@ -105,7 +105,7 @@ export default function RideRequestsPage() {
       console.error('Accept request error:', error)
       toast({
         title: 'Could not accept request',
-        description: error instanceof Error ? error.message : 'It may have just been accepted by someone else.',
+        description: getErrorMessage(error, 'It may have just been accepted by someone else.'),
         variant: 'destructive',
       })
       setAcceptTarget(null)
