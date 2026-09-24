@@ -23,6 +23,7 @@ There is no automated migration runner in this project — apply each file manua
 | 15 | `15_always_ask_driver.sql` | Removes the instant-booking path entirely: every booking on a driver-posted ride now goes through the driver as a request (revokes `book_ride()`'s grant), raises the per-ride attempt limit from 3 to 4, and a request now expires at the ride's departure time instead of a fixed 2 hours. See `docs/booking-requests.md`. |
 | 16 | `16_fix_departure_check.sql` | **Bug fix, run promptly.** `01_schema.sql`'s `valid_departure` check re-validated on every update, not just when a ride was created — so any update to a ride more than an hour past departure (marking it completed, "Didn't happen", adjusting seats, ticking someone picked up) failed outright. Replaced with a trigger that only checks departure_time when it's actually being set. |
 | 17 | `17_fix_ride_request_departure_check.sql` | **Bug fix, run promptly.** Same bug as 16, on `07_ride_requests.sql`'s `valid_request_departure` check — withdrawing an old, never-matched "I need a ride" post failed outright once its departure passed. Same fix. |
+| 18 | `18_ride_visibility_for_own_bookings.sql` | **Bug fix, run promptly.** A passenger lost access to a ride entirely once it was marked completed or cancelled (no longer active/full, and they're not its driver) — "My Bookings" then crashed reading the now-`null` embedded ride. Now a passenger can always see a ride they've booked or sent a booking request for, whatever its current status. |
 
 ## Verifying a step worked
 

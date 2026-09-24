@@ -101,7 +101,10 @@ export default function MyRidesPage() {
       // Fetch my bookings with timeout
       try {
         const bookingsData = await withTimeout(bookingsRepository.getBookingsForPassenger(user.id), 15000)
-        setMyBookings(bookingsData)
+        // Defensive: a ride can come back null on the embed if RLS ever blocks it (migration 18
+        // fixes the known case — a completed/cancelled ride used to be invisible to its own
+        // passenger). Drop rather than crash the whole page on one bad row.
+        setMyBookings(bookingsData.filter((booking) => booking.ride != null))
       } catch (bookingsError) {
         console.error('Error fetching bookings:', bookingsError)
         setError('Failed to load your bookings. Please try again.')
