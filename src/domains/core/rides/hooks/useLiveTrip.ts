@@ -135,7 +135,9 @@ export function useLiveTrip(passengerLocationSharingEnabled: boolean) {
             teardown()
             setLiveTrip(null)
             setLivePosition(null)
-            setLiveError('Location permission was denied. Allow location access to start a trip.')
+            setLiveError(
+              "Your browser blocked location. Check your phone's Location Services setting for this app, not just this site's permission."
+            )
           } else {
             // A dropped signal (tunnel, cloud cover) usually recovers on its own.
             setLiveError('Waiting for a GPS signal…')
