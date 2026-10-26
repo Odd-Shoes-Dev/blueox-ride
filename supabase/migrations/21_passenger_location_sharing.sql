@@ -116,3 +116,6 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.bookings;
   END IF;
 END $$;
+
+
+--to turn back on the location: UPDATE public.app_settings SET value = 'true'::jsonb WHERE key = 'passenger_location_sharing_enabled';
